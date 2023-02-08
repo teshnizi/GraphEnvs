@@ -1,0 +1,10 @@
+[build-system]
+requires = [
+    "setuptools>=42",
+    "wheel",
+    "gymnasium>=0.27.1",
+    "torch>=1.12",
+    "torch-geometric",
+    "networkx",
+]
+build-backend = "setuptools.build_meta"
