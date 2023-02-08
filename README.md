@@ -1,5 +1,5 @@
-# GraphRL
-A set of reinforcement learning graph environments. 
+# GraphEnvs
+Graph Reinforcement Learning (RL) Environments
 
 ## Installation
 
