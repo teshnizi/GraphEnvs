@@ -3,7 +3,7 @@ Graph Reinforcement Learning (RL) Environments
 
 ## Installation
 
-First install [torch](https://pytorch.org/TensorRT/tutorials/installation.html) and [pytorch geometric](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html). The simply use pip to install graph_envs:
+First install [torch](https://pytorch.org/) and [pytorch geometric](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html). The simply use pip to install graph_envs:
 ```bash
   pip install graph-envs
 ```
