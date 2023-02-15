@@ -11,5 +11,5 @@ name = "graph_envs"
 
 register(
     id='ShortestPath-v0',
-    entry_point='envs.shortest_path:ShortestPathEnv',
+    entry_point='src.graph_envs.shortest_path:ShortestPathEnv',
 )
