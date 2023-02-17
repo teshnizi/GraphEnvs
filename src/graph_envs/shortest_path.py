@@ -70,7 +70,6 @@ class ShortestPathEnv(gym.Env):
         
         info = {'mask': self._get_mask()}
         
-        sample = self.observation_space.sample(mask=None, num_nodes=self.n_nodes, num_edges=2*self.n_edges)
         return self.graph, info
     
     def _get_neighbors(self, node):
