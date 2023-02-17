@@ -12,23 +12,22 @@ First install [torch](https://pytorch.org/) and [pytorch geometric](https://pyto
 
 ```python
 import gymnasium as gym 
-import graph_envs
+from src.graph_envs import shortest_path
 import numpy as np
 
-env = gym.make('ShortestPath-v0', n_nodes=10, n_edges=20)
+env = gym.make('ShortestPath-v0', n_nodes=5, n_edges=7)
 
 for _ in range(5):
+    
     obs, info = env.reset()
     mask = info['mask']
-    
     done = False
+    
     while not done:
-        valid_actions = mask.nonzero()
-        action = np.random.choice(len(valid_actions[0]))
-        action = (valid_actions[0][action], valid_actions[1][action])
-        
+        valid_actions = mask.nonzero()[0]
+        action = np.random.choice(valid_actions)
         obs, reward, done, _, info = env.step(action)
-        print(obs, reward, done)
+        print(obs, rewards, done)
         mask = info['mask']
 
 ```
