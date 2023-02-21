@@ -5,3 +5,4 @@ src/.DS_Store
 .DS_Store
 src/graph_envs/__pycache__/
 main.py
+tests/__pycache__/

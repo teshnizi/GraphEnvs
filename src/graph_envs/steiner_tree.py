@@ -10,6 +10,17 @@ import random
 
 from typing import Tuple
 
+
+def get_prime_numbers(n):
+    '''
+    Returns a list of prime numbers less than n
+    '''
+    prime_numbers = []
+    for num in range(2, n):
+        if all(num % i != 0 for i in range(2, num)):
+            prime_numbers.append(num)
+    return prime_numbers
+
 class SteinerTreeEnv(gym.Env):
     '''
     Environment for shortest path problem.
@@ -64,9 +75,9 @@ class SteinerTreeEnv(gym.Env):
         
        
         x = np.zeros((self.n_nodes, 1), dtype=np.float32) + self.HAS_NOTHING
-        self.dests = np.random.choice(self.n_nodes, size=self.n_dests+1, replace=False)
         
-
+        self.dests = np.random.choice(self.n_nodes, self.n_dests, replace=False)
+        
         self.approx_solution = nx.algorithms.approximation.steinertree.steiner_tree(G, self.dests, weight='delay', method='kou')
         G = G.to_directed()
         
@@ -94,7 +105,7 @@ class SteinerTreeEnv(gym.Env):
     def _get_mask(self) -> np.array:
         mask = np.zeros((2 * self.n_edges,), dtype=bool) < 1.0
         mask[self.graph.nodes.flatten()[self.graph.edge_links[:, 0]] != self.IS_TAKEN] = False
-        mask[self.graph.nodes.flatten()[self.graph.edge_links[:, 1]] == self.IS_TAKEN] = False
+        mask[self.graph.nodes.flatten()[self.graph.edge_links[:, 1]] != self.HAS_NOTHING] = False
         return mask
     
     def step(self, action: Tuple[int, int]) -> Tuple[gym.spaces.GraphInstance, SupportsFloat, bool, bool, dict]:

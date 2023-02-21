@@ -19,7 +19,7 @@ class ShortestPathEnv(gym.Env):
         - weighted: whether the graph is weighted or not
     '''
     
-    def __init__(self, n_nodes, n_edges, weighted=True) -> None:
+    def __init__(self, n_nodes, n_edges, weighted=True, return_graph_obs=False) -> None:
         super(ShortestPathEnv, self).__init__()
         
         self.HAS_NOTHING = np.array([1.0], dtype=np.float32)
@@ -31,10 +31,12 @@ class ShortestPathEnv(gym.Env):
         self.weighted = weighted
         self.action_space = gym.spaces.Discrete(n_nodes)
         # self.observation_space = gym.spaces.Box(low=-1., high=11., shape=(2, n_nodes, n_nodes))        
-        self.observation_space = gym.spaces.Graph(
-            node_space=gym.spaces.Box(low=0, high=4, shape=(1,)), 
-            edge_space=gym.spaces.Box(low=0, high=1, shape=(1,)),
-            )
+        # self.observation_space = gym.spaces.Graph(
+        #     node_space=gym.spaces.Box(low=0, high=4, shape=(1,)), 
+        #     edge_space=gym.spaces.Box(low=0, high=1, shape=(1,)),
+        #     )
+        self.observation_space = gym.spaces.Box(low=0, high=1000, shape=(n_nodes+2*n_edges+2*n_edges*2,))
+        self.return_graph_obs = return_graph_obs
 
     def reset(self, seed=None, options={}) -> np.array:
         super().reset(seed=seed)
@@ -68,9 +70,17 @@ class ShortestPathEnv(gym.Env):
          
         self.optimal_solution = nx.shortest_path_length(G, source=self.src, target=self.dest, weight='delay')
         
-        info = {'mask': self._get_mask()}
         
-        return self.graph, info
+        info = {'mask': self._get_mask(), 'devectorize_func': (lambda vector: self._devectorize_graph(vector))}
+        
+        if self.return_graph_obs:
+            info['graph_obs'] = self.graph
+        
+        return self._vectorize_graph(self.graph), info
+    
+    def _vectorize_graph(self, graph):
+        return np.concatenate((graph.nodes.flatten(), graph.edges.flatten(), graph.edge_links.flatten()), dtype=np.float32)
+    
     
     def _get_neighbors(self, node):
         neigbors = self.graph.edge_links[self.graph.edge_links[:, 0] == node, 1]
@@ -107,5 +117,5 @@ class ShortestPathEnv(gym.Env):
         if done:
             info['optimal_solution'] = self.optimal_solution
         
-        return self.graph, reward, done, False, info
+        return self._vectorize_graph(self.graph), reward, done, False, info
         
