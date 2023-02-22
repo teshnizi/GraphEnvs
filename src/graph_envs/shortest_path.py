@@ -62,7 +62,7 @@ class ShortestPathEnv(gym.Env):
         self.src, self.dest = np.random.choice(self.n_nodes, size=2, replace=False)
         x[self.src], x[self.dest] = self.IS_TAKEN, self.IS_TARGET
         self.head = self.src
-        self.adj = nx.adjacency_matrix(G).todense()
+        self.adj = nx.adjacency_matrix(G, weight='delay').todense()
         
         edge_index = np.array(list(G.edges))
         edge_f = np.array([G[u][v]['delay'] for u, v in G.edges], dtype=np.float32).reshape(-1, 1)
@@ -104,18 +104,24 @@ class ShortestPathEnv(gym.Env):
         reward = -self.adj[self.head, action]
         
         if np.isclose(self.graph.nodes[action], self.IS_TARGET):
+            # reward += 2
             done = True
             
         self.graph.nodes[action] = self.IS_TAKEN
+        init_head = self.head
         self.head = action
         
         info = {'mask': self._get_mask()}
-        if info['mask'].sum() == 0:
+        if (not done) and (info['mask'].sum() == 0):
             done = True
             reward = -10
             
         if done:
             info['optimal_solution'] = self.optimal_solution
+            if reward < -5:
+                info['solved'] = False
+            else:
+                info['solved'] = True
         
         return self._vectorize_graph(self.graph), reward, done, False, info
         
