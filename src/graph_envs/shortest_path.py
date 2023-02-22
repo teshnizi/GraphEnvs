@@ -71,7 +71,7 @@ class ShortestPathEnv(gym.Env):
         self.optimal_solution = nx.shortest_path_length(G, source=self.src, target=self.dest, weight='delay')
         
         
-        info = {'mask': self._get_mask(), 'devectorize_func': (lambda vector: self._devectorize_graph(vector))}
+        info = {'mask': self._get_mask()}
         
         if self.return_graph_obs:
             info['graph_obs'] = self.graph
