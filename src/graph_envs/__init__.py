@@ -16,6 +16,10 @@ name = "graph_envs"
 #     entry_point='src.graph_envs.steiner_tree:SteinerTreeEnv',
 # )
 
+# register(
+#     id='MaxIndependentSet-v0',
+#     entry_point='src.graph_envs.max_independent_set:MaxIndependentSet',
+# )
 
 
 ## For packaging:
@@ -28,4 +32,9 @@ register(
 register(
     id='SteinerTree-v0',
     entry_point='graph_envs.steiner_tree:SteinerTreeEnv',
+)
+
+register(
+    id='MaxIndependentSet-v0',
+    entry_point='graph_envs.max_independent_set:MaxIndependentSetEnv',
 )

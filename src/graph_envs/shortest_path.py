@@ -3,12 +3,11 @@ import gymnasium as gym
 # import torch_geometric as pyg 
 import numpy as np 
 
-from typing import TYPE_CHECKING, Any, Generic, SupportsFloat, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, SupportsFloat, TypeVar, Tuple
 
 import networkx as nx 
 import random
 
-from typing import Tuple
 
 class ShortestPathEnv(gym.Env):
     '''
@@ -49,7 +48,7 @@ class ShortestPathEnv(gym.Env):
                 break
         
         if self.weighted:
-            delay = np.random.randint(1, 10, size=(self.n_nodes, self.n_nodes))/10.0
+            delay = np.random.randint(3, 10, size=(self.n_nodes, self.n_nodes))/10.0
             # delay = np.random.randint(1, 3, size=(self.n_nodes, self.n_nodes))*1.0
         else:
             delay = np.random.randint(10, 11, size=(self.n_nodes, self.n_nodes))/10.0
@@ -129,9 +128,5 @@ class ShortestPathEnv(gym.Env):
         if done:
             info['heuristic_solution'] = self.optimal_solution
                 
-        
-        # print('==')
-        # print(action, reward)
-        # print(self.graph.nodes)
         return self._vectorize_graph(self.graph), reward, done, False, info
         

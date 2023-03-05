@@ -72,7 +72,7 @@ class SteinerTreeEnv(gym.Env):
                 break
         
         if self.weighted:
-            delay = np.random.randint(1, 10, size=(self.n_nodes, self.n_nodes))/10.0
+            delay = np.random.randint(3, 10, size=(self.n_nodes, self.n_nodes))/10.0
         else:
             delay = np.random.randint(10, 11, size=(self.n_nodes, self.n_nodes))/10.0
         
@@ -87,6 +87,9 @@ class SteinerTreeEnv(gym.Env):
         
         if self.n_dests == 1:
             self.approx_solution = nx.algorithms.shortest_paths.generic.shortest_path_length(G, self.dests[0], self.dests[1], weight='delay')
+        elif self.n_dests == self.n_nodes - 1:
+            self.approx_solution = sum([features['delay'] for _, _, features in nx.minimum_spanning_edges(G, weight='delay')])
+            approx_solution_graph = nx.algorithms.approximation.steinertree.steiner_tree(G, self.dests, weight='delay', method='kou')  
         else:
             approx_solution_graph = nx.algorithms.approximation.steinertree.steiner_tree(G, self.dests, weight='delay', method='kou')  
             self.approx_solution = sum([G[u][v]['delay'] for u, v in approx_solution_graph.edges()])
