@@ -39,7 +39,7 @@ for _ in range(5):
 | :----: |    :----:   | :-------:|
 | Shortest Path      | ✅       | $v \in \mathcal{V}$   |
 | Steiner Tree   | ✅   | $e \in \mathcal{E}$      |
-| MST   | :heavy_multiplication_x:   | $e \in \mathcal{E}$      |
+| MST   | ✅  | $e \in \mathcal{E}$      |
 | MultiCast Routing   | :heavy_multiplication_x:   | $(e, m) \in \mathcal{E} \times \{1,2,..., M\}$ |
 | Minimum Vertex Cover   | :heavy_multiplication_x:   | $v \in \mathcal{V}$ |
 | TSP   | :heavy_multiplication_x:   | $v \in \mathcal{V}$ |
