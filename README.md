@@ -45,6 +45,7 @@ for _ in range(5):
 | TSP   | ✅   | $v \in \mathcal{V}$ |
 | Longest Path   | :heavy_multiplication_x:   | $v \in \mathcal{V}$ |
 | Largest Clique   | :heavy_multiplication_x:   | $v \in \mathcal{V}$ |
+| Hamilton Path   | ✅   | $v \in \mathcal{V}$ |
 
 
 
