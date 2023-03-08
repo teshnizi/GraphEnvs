@@ -47,6 +47,7 @@ for _ in range(5):
 | Largest Clique   | :heavy_multiplication_x:   | $v \in \mathcal{V}$ |
 | Hamilton Path   | ✅   | $v \in \mathcal{V}$ |
 | Densest Subgraph   | :heavy_multiplication_x:  | $v \in \mathcal{V}$ |
+| Topological sorting   | :heavy_multiplication_x:  | $v \in \mathcal{V}$ |
 
 
 
