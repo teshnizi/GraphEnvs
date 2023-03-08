@@ -36,7 +36,8 @@ class ShortestPathEnv(gym.Env):
         #     )
         self.observation_space = gym.spaces.Box(low=0, high=1000, shape=(2*n_nodes+2*n_edges+2*n_edges*2,))
         self.return_graph_obs = return_graph_obs
-
+        self.solution_cost = 0
+        
     def reset(self, seed=None, options={}) -> np.array:
         super().reset(seed=seed)
         random.seed(seed)
@@ -80,7 +81,7 @@ class ShortestPathEnv(gym.Env):
         if self.return_graph_obs:
             info['graph_obs'] = self.graph
         
-        
+        self.solution_cost = 0
         return self._vectorize_graph(self.graph), info
     
     def _vectorize_graph(self, graph):
@@ -108,6 +109,7 @@ class ShortestPathEnv(gym.Env):
         
         done = False
         reward = -self.adj[self.head, action]
+        self.solution_cost -= reward
         info = {}
         
         if np.isclose(self.graph.nodes[action, 1], self.IS_TARGET):
@@ -127,6 +129,6 @@ class ShortestPathEnv(gym.Env):
             
         if done:
             info['heuristic_solution'] = self.optimal_solution
-                
+            info['solution_cost'] = self.solution_cost
         return self._vectorize_graph(self.graph), reward, done, False, info
         

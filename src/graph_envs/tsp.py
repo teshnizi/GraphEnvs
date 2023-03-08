@@ -58,7 +58,6 @@ class TSPEnv(gym.Env):
         
         G = G.to_directed()
         
-        
         x = np.zeros((self.n_nodes, 1), dtype=np.float32)
         
         self.head = 0
@@ -70,13 +69,18 @@ class TSPEnv(gym.Env):
         edge_f = np.array([G[u][v]['weight'] for u, v in G.edges], dtype=np.float32).reshape(-1, 1)
         self.graph = gym.spaces.GraphInstance(nodes=x, edges=edge_f, edge_links=edge_index)
          
-        
+       
         self.optimal_solution = 0
-        if self.is_eval_env:
-            self.optimal_cycle = nx.approximation.traveling_salesman_problem(G, weight='weight')
+        if self.is_eval_env == False:
+            self.optimal_cycle = nx.approximation.traveling_salesman_problem(G, weight='weight', cycle=False)
+            # self.optimal_cycle = nx.approximation.simulated_annealing_tsp(G, weight='weight', init_cycle=None,)
+            # self.optimal_cycle = nx.approximation.threshold_accepting_tsp(G, weight='weight', init_cycle=,)
+            # self.optimal_cycle = nx.approximation.greedy_tsp(G, weight='weight')
+            # print(self.optimal_cycle)
             for i in range(len(self.optimal_cycle)-1):
                 self.optimal_solution += G[self.optimal_cycle[i]][self.optimal_cycle[i+1]]['weight']
-        
+        print(self.optimal_solution)
+
         self.total_solution_cost = 0
         
         
@@ -111,7 +115,11 @@ class TSPEnv(gym.Env):
         
         
         done = False
-        reward = 1-self.adj[self.head, action]
+        if not self.weighted:
+            reward = 1 
+        else:
+            reward = 1-self.adj[self.head, action]
+            
         self.total_solution_cost += self.adj[self.head, action]
         info = {}
         
@@ -121,7 +129,7 @@ class TSPEnv(gym.Env):
         
         if np.isclose(self.graph.nodes[:, self.NODE_TAKEN], 0).any() == False:    
             done = True
-            reward += self.num_nodes
+            reward += self.n_nodes
             info['solved'] = True
         
         

@@ -113,6 +113,7 @@ class SteinerTreeEnv(gym.Env):
         self.graph = gym.spaces.GraphInstance(nodes=x, edges=edge_f, edge_links=edge_index)
         self.generated_solution = []
 
+        self.solution_cost = 0
         info = {'mask': self._get_mask()}
         self._vectorize_graph(self.graph)
         return self._vectorize_graph(self.graph), info
@@ -143,6 +144,7 @@ class SteinerTreeEnv(gym.Env):
         
         done = False
         reward = -self.graph.edges[action, self.EDGE_WEIGHT]
+        self.solution_cost -= reward
         self.graph.nodes[v, self.NODE_HAS_MSG] = 1
         self.generated_solution.append((u, v))
         
@@ -160,6 +162,7 @@ class SteinerTreeEnv(gym.Env):
         if done:
             info['heuristic_solution'] = self.approx_solution
             info['solved'] = True
+            info['solution_cost'] = self.solution_cost
             pass
         else:
             assert info['mask'].sum() > 0, "No more actions possible! Shouldn't happen!"

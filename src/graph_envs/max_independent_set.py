@@ -73,7 +73,7 @@ class MaxIndependentSet(gym.Env):
         if self.return_graph_obs:
             info['graph_obs'] = self.graph
         
-        
+        self.solution_cost = 0
         return self._vectorize_graph(self.graph), info
     
     
@@ -101,6 +101,7 @@ class MaxIndependentSet(gym.Env):
         
         done = False
         reward = -self.graph.nodes[action, self.NODE_WEIGHT]
+        self.solution_cost -= reward
         info = {}
         
         self.graph.nodes[action, self.NODE_IS_TAKEN] = 1
@@ -112,6 +113,7 @@ class MaxIndependentSet(gym.Env):
         
         if done:
             info['heuristic_solution'] = self.approx_solution
+            info['solution_cost'] = self.solution_cost
         
         return self._vectorize_graph(self.graph), reward, done, False, info
           
