@@ -41,8 +41,14 @@ for _ in range(5):
 | Steiner Tree   | ✅   | $e \in \mathcal{E}$      |
 | MST   | ✅  | $e \in \mathcal{E}$      |
 | MultiCast Routing   | :heavy_multiplication_x:   | $(e, m) \in \mathcal{E} \times \{1,2,..., M\}$ |
-| Minimum Vertex Cover   | :heavy_multiplication_x:   | $v \in \mathcal{V}$ |
-| TSP   | :heavy_multiplication_x:   | $v \in \mathcal{V}$ |
+| Minimum Vertex Cover   | ✅   | $v \in \mathcal{V}$ |
+| TSP   | ✅   | $v \in \mathcal{V}$ |
+| Longest Path   | :heavy_multiplication_x:   | $v \in \mathcal{V}$ |
+| Largest Clique   | :heavy_multiplication_x:   | $v \in \mathcal{V}$ |
+| Hamilton Path   | ✅   | $v \in \mathcal{V}$ |
+| Densest Subgraph   | :heavy_multiplication_x:  | $v \in \mathcal{V}$ |
+| Topological sorting   | :heavy_multiplication_x:  | $v \in \mathcal{V}$ |
+
 
 
 1. **Shortest Path**: The goal is to find the shortest path from the source node to the target node. At each step, an edge is added to the path. The episode is over when we reach the target node.
