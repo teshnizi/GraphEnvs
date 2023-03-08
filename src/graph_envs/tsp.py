@@ -18,7 +18,7 @@ class TSPEnv(gym.Env):
         - weighted: whether the graph is weighted or not
     '''
     
-    def __init__(self, n_nodes, n_edges, weighted=True, return_graph_obs=False) -> None:
+    def __init__(self, n_nodes, n_edges, weighted=True, return_graph_obs=False, is_eval_env=False) -> None:
         super(TSPEnv, self).__init__()
         
         self.NODE_TAKEN = 0
@@ -33,6 +33,9 @@ class TSPEnv(gym.Env):
         
         self.return_graph_obs = return_graph_obs
 
+        self.is_eval_env = is_eval_env
+        
+        
     def reset(self, seed=None, options={}) -> np.array:
         super().reset(seed=seed)
         random.seed(seed)
@@ -51,20 +54,31 @@ class TSPEnv(gym.Env):
             
         
         for u, v, d in G.edges(data=True):
-            d['delay'] = delay[u, v]
+            d['weight'] = delay[u, v]
         
         G = G.to_directed()
         
-        x = np.zeros((self.n_nodes, 1), dtype=np.float32) + self.HAS_NOTHING
+        
+        x = np.zeros((self.n_nodes, 1), dtype=np.float32)
         
         self.head = 0
-        self.adj = nx.adjacency_matrix(G, weight='delay').todense()
+        x[self.head, self.NODE_TAKEN] = 1
+        
+        self.adj = nx.adjacency_matrix(G, weight='weight').todense()
         
         edge_index = np.array(list(G.edges))
-        edge_f = np.array([G[u][v]['delay'] for u, v in G.edges], dtype=np.float32).reshape(-1, 1)
+        edge_f = np.array([G[u][v]['weight'] for u, v in G.edges], dtype=np.float32).reshape(-1, 1)
         self.graph = gym.spaces.GraphInstance(nodes=x, edges=edge_f, edge_links=edge_index)
          
-        self.optimal_solution = nx.approximation.traveling_salesman_problem(G, weight='delay')
+        
+        self.optimal_solution = 0
+        if self.is_eval_env:
+            self.optimal_cycle = nx.approximation.traveling_salesman_problem(G, weight='weight')
+            for i in range(len(self.optimal_cycle)-1):
+                self.optimal_solution += G[self.optimal_cycle[i]][self.optimal_cycle[i+1]]['weight']
+        
+        self.total_solution_cost = 0
+        
         
         info = {'mask': self._get_mask()}
         
@@ -98,24 +112,29 @@ class TSPEnv(gym.Env):
         
         done = False
         reward = 1-self.adj[self.head, action]
+        self.total_solution_cost += self.adj[self.head, action]
         info = {}
         
         self.graph.nodes[action, self.NODE_TAKEN] = 1
         self.head = action
         
+        
         if np.isclose(self.graph.nodes[:, self.NODE_TAKEN], 0).any() == False:    
             done = True
+            reward += self.num_nodes
             info['solved'] = True
         
         
         info['mask'] = self._get_mask()
         if (not done) and (info['mask'].sum() == 0):
             done = True
-            reward = -self.n_nodes
+            # reward -= np.isclose(self.graph.nodes[:, self.NODE_TAKEN], 0).sum()
             info['solved'] = False
             
+        
         if done:
             info['heuristic_solution'] = self.optimal_solution
+            info['solution_cost'] = self.total_solution_cost
                 
         return self._vectorize_graph(self.graph), reward, done, False, info
         
