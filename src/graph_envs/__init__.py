@@ -36,5 +36,10 @@ register(
 
 register(
     id='MaxIndependentSet-v0',
-    entry_point='graph_envs.max_independent_set:MaxIndependentSetEnv',
+    entry_point='graph_envs.max_independent_set:MaxIndependentSet',
+)
+
+register(
+    id='TSP-v0',
+    entry_point='graph_envs.tsp:TSPEnv',
 )
