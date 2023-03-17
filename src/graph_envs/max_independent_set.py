@@ -17,7 +17,7 @@ class MaxIndependentSet(gym.Env):
         - weighted: whether the nodes are weighted or not
     '''
     
-    def __init__(self, n_nodes, n_edges, weighted=True, return_graph_obs=False) -> None:
+    def __init__(self, n_nodes, n_edges, weighted=True, return_graph_obs=False, is_eval_env=False) -> None:
         super(MaxIndependentSet, self).__init__()
         
         
@@ -31,6 +31,7 @@ class MaxIndependentSet(gym.Env):
         
         self.return_graph_obs = return_graph_obs
         self.observation_space = gym.spaces.Box(low=0, high=1000, shape=(2*n_nodes+2*n_edges+2*n_edges*2,))
+        self.is_eval_env = is_eval_env
         
         
     def reset(self, seed=None, options={}) -> np.array:
@@ -52,11 +53,12 @@ class MaxIndependentSet(gym.Env):
         for u in G.nodes():
             G.nodes[u]['cost'] = cost[u]
             
-        if not self.weighted:
-            self.approx_solution = len(nx.approximation.maximum_independent_set(G))
-        else:
-            self.approx_solution = -1
-            
+        self.approx_solution = 0
+        if self.is_eval_env:
+            if not self.weighted:
+                self.approx_solution = len(nx.approximation.maximum_independent_set(G))
+            else:
+                self.approx_solution = -1
             
         G = G.to_directed()
         

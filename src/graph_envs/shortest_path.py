@@ -18,7 +18,7 @@ class ShortestPathEnv(gym.Env):
         - weighted: whether the graph is weighted or not
     '''
     
-    def __init__(self, n_nodes, n_edges, weighted=True, return_graph_obs=False) -> None:
+    def __init__(self, n_nodes, n_edges, weighted=True, return_graph_obs=False, is_eval_env=False) -> None:
         super(ShortestPathEnv, self).__init__()
         
         self.HAS_NOTHING = np.array([0.0], dtype=np.float32)
@@ -37,6 +37,7 @@ class ShortestPathEnv(gym.Env):
         self.observation_space = gym.spaces.Box(low=0, high=1000, shape=(2*n_nodes+2*n_edges+2*n_edges*2,))
         self.return_graph_obs = return_graph_obs
         self.solution_cost = 0
+        self.is_eval_env = is_eval_env
         
     def reset(self, seed=None, options={}) -> np.array:
         super().reset(seed=seed)
@@ -70,9 +71,11 @@ class ShortestPathEnv(gym.Env):
         edge_index = np.array(list(G.edges))
         edge_f = np.array([G[u][v]['delay'] for u, v in G.edges], dtype=np.float32).reshape(-1, 1)
         self.graph = gym.spaces.GraphInstance(nodes=x, edges=edge_f, edge_links=edge_index)
-         
-        self.optimal_solution = nx.shortest_path_length(G, source=self.src, target=self.dest, weight='delay')
-        # self.optimal_solution = 0
+        
+        self.optimal_solution = 0
+        if self.is_eval_env:
+            self.optimal_solution = nx.shortest_path_length(G, source=self.src, target=self.dest, weight='delay')
+        
         
         # print('-----')
         # print(self.graph.nodes)

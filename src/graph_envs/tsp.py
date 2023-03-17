@@ -29,14 +29,13 @@ class TSPEnv(gym.Env):
         self.weighted = weighted
         
         self.action_space = gym.spaces.Discrete(n_nodes)
-        self.observation_space = gym.spaces.Box(low=0, high=1000, shape=(n_nodes+2*n_edges+2*n_edges*2,))
+        self.observation_space = gym.spaces.Box(low=0, high=1000, shape=(2*n_nodes+2*n_edges+2*n_edges*2,))
         
         self.return_graph_obs = return_graph_obs
-
         self.is_eval_env = is_eval_env
         
-        
     def reset(self, seed=None, options={}) -> np.array:
+        
         super().reset(seed=seed)
         random.seed(seed)
         np.random.seed(seed)
@@ -56,12 +55,22 @@ class TSPEnv(gym.Env):
         for u, v, d in G.edges(data=True):
             d['weight'] = delay[u, v]
         
+        self.optimal_solution = 0
+        
+        if self.is_eval_env == True:
+            self.optimal_cycle = nx.approximation.traveling_salesman_problem(G, weight='weight', cycle=False)
+            for i in range(len(self.optimal_cycle)-1):
+                self.optimal_solution += G[self.optimal_cycle[i]][self.optimal_cycle[i+1]]['weight']
+            
         G = G.to_directed()
         
-        x = np.zeros((self.n_nodes, 1), dtype=np.float32)
+        x = np.zeros((self.n_nodes, 2), dtype=np.float32)
         
         self.head = 0
         x[self.head, self.NODE_TAKEN] = 1
+        
+        # adding node degrees as a feature:
+        x[:, 1] = [G.degree[i] for i in range(self.n_nodes)]
         
         self.adj = nx.adjacency_matrix(G, weight='weight').todense()
         
@@ -69,26 +78,15 @@ class TSPEnv(gym.Env):
         edge_f = np.array([G[u][v]['weight'] for u, v in G.edges], dtype=np.float32).reshape(-1, 1)
         self.graph = gym.spaces.GraphInstance(nodes=x, edges=edge_f, edge_links=edge_index)
          
-       
-        self.optimal_solution = 0
-        if self.is_eval_env == False:
-            self.optimal_cycle = nx.approximation.traveling_salesman_problem(G, weight='weight', cycle=False)
-            # self.optimal_cycle = nx.approximation.simulated_annealing_tsp(G, weight='weight', init_cycle=None,)
-            # self.optimal_cycle = nx.approximation.threshold_accepting_tsp(G, weight='weight', init_cycle=,)
-            # self.optimal_cycle = nx.approximation.greedy_tsp(G, weight='weight')
-            # print(self.optimal_cycle)
-            for i in range(len(self.optimal_cycle)-1):
-                self.optimal_solution += G[self.optimal_cycle[i]][self.optimal_cycle[i+1]]['weight']
-        print(self.optimal_solution)
-
         self.total_solution_cost = 0
-        
+        self.steps_taken = 0
         
         info = {'mask': self._get_mask()}
         
         if self.return_graph_obs:
             info['graph_obs'] = self.graph
         
+
         return self._vectorize_graph(self.graph), info
     
     def _vectorize_graph(self, graph):
@@ -102,30 +100,36 @@ class TSPEnv(gym.Env):
     def _get_mask(self) -> np.array:
         mask = np.zeros((self.n_nodes,), dtype=bool)
         mask[self._get_neighbors(self.head)] = 1
-        mask[self.graph.nodes[:, self.NODE_TAKEN] == 1] = 0
+        # mask[self.graph.nodes[:, self.NODE_TAKEN] == 1] = 0
         return mask
     
     def step(self, action: int) -> Tuple[gym.spaces.GraphInstance, SupportsFloat, bool, bool, dict]:
+        
         
         assert (action < self.n_nodes), f"Node {action} is out of bounds!"
         assert self._get_mask()[action] == True, f"Mask of {action} is False!"
 
         assert action in self._get_neighbors(self.head), f"Node {action} is not a neighbor of the current path head {self.head}!"
-        assert np.isclose(self.graph.nodes[action, self.NODE_TAKEN], 1) == False, f"Node {action} is already a part of the path!"
+        # assert np.isclose(self.graph.nodes[action, self.NODE_TAKEN], 1) == False, f"Node {action} is already a part of the path!"
         
+        self.steps_taken += 1
         
         done = False
-        if not self.weighted:
-            reward = 1 
-        else:
-            reward = 1-self.adj[self.head, action]
-            
+        # if not self.weighted:
+        #     reward = 1 
+        # else:
+        #     reward = 1-self.adj[self.head, action]
+        
+        reward = -self.adj[self.head, action]
+        
         self.total_solution_cost += self.adj[self.head, action]
         info = {}
         
-        self.graph.nodes[action, self.NODE_TAKEN] = 1
-        self.head = action
         
+        reward = reward + 1 - self.graph.nodes[action, self.NODE_TAKEN]
+
+        self.graph.nodes[action, self.NODE_TAKEN] += 1
+        self.head = action
         
         if np.isclose(self.graph.nodes[:, self.NODE_TAKEN], 0).any() == False:    
             done = True
@@ -134,15 +138,20 @@ class TSPEnv(gym.Env):
         
         
         info['mask'] = self._get_mask()
-        if (not done) and (info['mask'].sum() == 0):
+        if (not done) and ((info['mask'].sum() == 0) or (self.steps_taken > self.n_nodes*2)):
             done = True
             # reward -= np.isclose(self.graph.nodes[:, self.NODE_TAKEN], 0).sum()
             info['solved'] = False
             
-        
+        # if self.is_eval_env:
+        #     print(f"Step {self.steps_taken}: -> {action} | Reward: {reward}")
+            
         if done:
             info['heuristic_solution'] = self.optimal_solution
             info['solution_cost'] = self.total_solution_cost
+            # if self.is_eval_env:
+            #     print('=====')
+
                 
         return self._vectorize_graph(self.graph), reward, done, False, info
         
