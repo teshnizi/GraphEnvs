@@ -46,10 +46,9 @@ class TSPEnv(gym.Env):
                 break
         
         if self.weighted:
-            delay = np.random.randint(3, 10, size=(self.n_nodes, self.n_nodes))/10.0
-            # delay = np.random.randint(1, 3, size=(self.n_nodes, self.n_nodes))*1.0
+            delay = np.random.randint(1, 5, size=(self.n_nodes, self.n_nodes))*1.0
         else:
-            delay = np.random.randint(10, 11, size=(self.n_nodes, self.n_nodes))/10.0
+            delay = np.random.randint(1, 2, size=(self.n_nodes, self.n_nodes))/1.0
             
         
         for u, v, d in G.edges(data=True):
@@ -58,7 +57,7 @@ class TSPEnv(gym.Env):
         self.optimal_solution = 0
         
         if self.is_eval_env == True:
-            self.optimal_cycle = nx.approximation.traveling_salesman_problem(G, weight='weight', cycle=False)
+            self.optimal_cycle = nx.approximation.traveling_salesman_problem(G, weight='weight', cycle=True)
             for i in range(len(self.optimal_cycle)-1):
                 self.optimal_solution += G[self.optimal_cycle[i]][self.optimal_cycle[i+1]]['weight']
             
@@ -100,58 +99,52 @@ class TSPEnv(gym.Env):
     def _get_mask(self) -> np.array:
         mask = np.zeros((self.n_nodes,), dtype=bool)
         mask[self._get_neighbors(self.head)] = 1
-        # mask[self.graph.nodes[:, self.NODE_TAKEN] == 1] = 0
+        mask[self.graph.nodes[:, self.NODE_TAKEN] == 1] = 0
         return mask
     
     def step(self, action: int) -> Tuple[gym.spaces.GraphInstance, SupportsFloat, bool, bool, dict]:
         
-        
         assert (action < self.n_nodes), f"Node {action} is out of bounds!"
         assert self._get_mask()[action] == True, f"Mask of {action} is False!"
-
         assert action in self._get_neighbors(self.head), f"Node {action} is not a neighbor of the current path head {self.head}!"
-        # assert np.isclose(self.graph.nodes[action, self.NODE_TAKEN], 1) == False, f"Node {action} is already a part of the path!"
-        
+
         self.steps_taken += 1
         
-        done = False
-        # if not self.weighted:
-        #     reward = 1 
-        # else:
-        #     reward = 1-self.adj[self.head, action]
-        
-        reward = -self.adj[self.head, action]
-        
-        self.total_solution_cost += self.adj[self.head, action]
         info = {}
+        done = False
+      
         
-        
+        # Calculate the reward:
+        reward = 0
+        reward = reward - self.adj[self.head, action]
         reward = reward + 1 - self.graph.nodes[action, self.NODE_TAKEN]
-
-        self.graph.nodes[action, self.NODE_TAKEN] += 1
+        
+        # Add the cost of the edge to the total solution cost:
+        self.total_solution_cost += self.adj[self.head, action]
+        
+        # Mark the node as taken:
+        self.graph.nodes[action, self.NODE_TAKEN] = 1
+        
+        # Update the head:
         self.head = action
         
-        if np.isclose(self.graph.nodes[:, self.NODE_TAKEN], 0).any() == False:    
-            done = True
-            reward += self.n_nodes
-            info['solved'] = True
-        
+        # If all nodes are taken and the head is back to the start node, the episode is done:
+        if np.isclose(self.graph.nodes[:, self.NODE_TAKEN], 0).any() == False:   
+            if action == 0: 
+                done = True
+                reward += self.n_nodes
+                info['solved'] = True
         
         info['mask'] = self._get_mask()
         if (not done) and ((info['mask'].sum() == 0) or (self.steps_taken > self.n_nodes*2)):
             done = True
-            # reward -= np.isclose(self.graph.nodes[:, self.NODE_TAKEN], 0).sum()
+            reward -= np.isclose(self.graph.nodes[:, self.NODE_TAKEN], 0).sum()
             info['solved'] = False
-            
-        # if self.is_eval_env:
-        #     print(f"Step {self.steps_taken}: -> {action} | Reward: {reward}")
             
         if done:
             info['heuristic_solution'] = self.optimal_solution
             info['solution_cost'] = self.total_solution_cost
-            # if self.is_eval_env:
-            #     print('=====')
-
-                
+           
+           
         return self._vectorize_graph(self.graph), reward, done, False, info
         
