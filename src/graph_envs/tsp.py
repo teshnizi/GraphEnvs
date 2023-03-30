@@ -46,7 +46,7 @@ class TSPEnv(gym.Env):
                 break
         
         if self.weighted:
-            delay = np.random.randint(1, 5, size=(self.n_nodes, self.n_nodes))*1.0
+            delay = np.random.randint(3, 10, size=(self.n_nodes, self.n_nodes))/10.0
         else:
             delay = np.random.randint(1, 2, size=(self.n_nodes, self.n_nodes))/1.0
             
