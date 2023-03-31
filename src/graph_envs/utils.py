@@ -2,7 +2,9 @@ import numpy as np
 import gymnasium as gym 
 import torch 
 
-
+import networkx as nx 
+import torch_geometric as pyg
+import matplotlib.pyplot as plt
 
 def devectorize_graph(vector, env_id, **kwargs):
     bs = vector.shape[0]
@@ -18,7 +20,6 @@ def devectorize_graph(vector, env_id, **kwargs):
     
 
 def to_pyg_graph(x, edge_features, edge_index):
-    import torch_geometric as pyg
     graphs = [pyg.data.Data(x=x[i,:,:], edge_attr=edge_features[i,:,:], edge_index=edge_index[i,:,:].T) for i in range(x.shape[0])]
     batch = pyg.data.Batch.from_data_list(graphs).to(x.device)
     return batch
@@ -43,3 +44,14 @@ def get_env_info(env_id):
         action_type = "node"
         
     return node_f, edge_f, action_type
+
+
+
+def show_graph(G):
+    pos = nx.spring_layout(G)
+    nx.draw(G, pos, with_labels=True, font_weight='bold')
+    # draw edge labels: 
+    nx.draw_networkx_edge_labels(G, pos, edge_labels=nx.get_edge_attributes(G, 'delay'))
+    
+    # save to file:
+    plt.savefig("graph.png")

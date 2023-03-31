@@ -48,7 +48,7 @@ class MaxIndependentSet(gym.Env):
             cost = np.random.randint(3, 10, size=(self.n_nodes))/10.0
             
         else:
-            cost = np.random.randint(10, 11, size=(self.n_nodes))/10.0
+            cost = np.random.randint(1, 2, size=(self.n_nodes))/1.0
             
         for u in G.nodes():
             G.nodes[u]['cost'] = cost[u]
@@ -63,7 +63,8 @@ class MaxIndependentSet(gym.Env):
         G = G.to_directed()
         
         x = np.zeros((self.n_nodes, 2), dtype=np.float32)
-        x[:, 0] = cost
+        x[:, self.NODE_WEIGHT] = cost
+        
         
         edge_index = np.array(list(G.edges))
         edge_f = np.array([1.0 for u, v in G.edges], dtype=np.float32).reshape(-1, 1)
@@ -90,9 +91,6 @@ class MaxIndependentSet(gym.Env):
         mask = np.zeros((self.n_nodes,), dtype=bool)
         mask[self.graph.nodes[:, self.NODE_IS_TAKEN] == 0] = True
         
-        edges_with_taken_start = self.graph.edge_links[self.graph.nodes[self.graph.edge_links[:, 0], self.NODE_IS_TAKEN] == 1]
-        their_neighbours = edges_with_taken_start[:, 1]
-        mask[their_neighbours] = False
         return mask
 
     def step(self, action: int) -> Tuple[gym.spaces.GraphInstance, SupportsFloat, bool, bool, dict]:

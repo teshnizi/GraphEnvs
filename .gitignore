@@ -7,3 +7,4 @@ src/graph_envs/__pycache__/
 main.py
 tests/__pycache__/
 .pytest_cache/
+graph.png

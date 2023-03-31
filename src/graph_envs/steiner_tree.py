@@ -74,7 +74,7 @@ class SteinerTreeEnv(gym.Env):
         if self.weighted:
             delay = np.random.randint(3, 10, size=(self.n_nodes, self.n_nodes))/10.0
         else:
-            delay = np.random.randint(10, 11, size=(self.n_nodes, self.n_nodes))/10.0
+            delay = np.random.randint(1, 2, size=(self.n_nodes, self.n_nodes))/1.0
         
         for u, v, d in G.edges(data=True):
             d['delay'] = delay[u, v]

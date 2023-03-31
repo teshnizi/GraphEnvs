@@ -26,6 +26,10 @@ name = "graph_envs"
 #     entry_point='src.graph_envs.tsp:TSPEnv',
 # )
 
+# register(
+#     id='DistributionCenter-v0',
+#     entry_point='src.graph_envs.distribution_center:DistributionCenterEnv',
+# )
 
 ## For packaging:
 
@@ -47,4 +51,9 @@ register(
 register(
     id='TSP-v0',
     entry_point='graph_envs.tsp:TSPEnv',
+)
+
+register(
+    id='DistributionCenter-v0',
+    entry_point='graph_envs.distribution_center:DistributionCenterEnv',
 )
