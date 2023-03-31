@@ -7,7 +7,6 @@ import random
 import networkx as nx
 
 from typing import Tuple, SupportsFloat
-import src.graph_envs.utils as utils
 
 class DistributionCenterEnv(gym.Env):
     '''
@@ -65,6 +64,7 @@ class DistributionCenterEnv(gym.Env):
             if nx.is_connected(G):
                 break
         
+    
         if self.weighted:
             delay = np.random.randint(3, 10, size=(self.n_nodes, self.n_nodes))/10.0
         else:
@@ -87,6 +87,7 @@ class DistributionCenterEnv(gym.Env):
         G = G.to_directed()
         self.nx_graph = G
         
+        
         x = np.zeros((self.n_nodes, 5), dtype=np.float32)
         x[:, self.NODE_WEIGHT] = cost
         x[targets, self.NODE_IS_TARGET] = 1
@@ -98,17 +99,14 @@ class DistributionCenterEnv(gym.Env):
         
         self.graph = gym.spaces.GraphInstance(nodes=x, edges=edge_f, edge_links=edge_index)
         
-        
         self.in_range_dict = {}
         
         for t in targets:
             self.in_range_dict[t] = self.find_nodes_in_range(t, self.max_distance, G)
         
         
-        
         info = {'mask': self._get_mask()}
         
-        utils.show_graph(G)
         
         if self.return_graph_obs:
             info['graph_obs'] = self.graph
@@ -157,7 +155,6 @@ class DistributionCenterEnv(gym.Env):
         
         info['mask'] = self._get_mask()
         
-        
         targets_left = np.logical_and(self.graph.nodes[:, self.NODE_IS_TARGET] == 1, self.graph.nodes[:, self.NODE_IS_COVERED] == 0).nonzero()[0]
         if len(targets_left) == 0:
             done = True
@@ -166,7 +163,6 @@ class DistributionCenterEnv(gym.Env):
         if done:
             info['heuristic_solution'] = self.approx_solution
             info['solution_cost'] = self.solution_cost
-        
         return self._vectorize_graph(self.graph), reward, done, False, info
           
         
