@@ -35,20 +35,29 @@ for _ in range(5):
 
 ## Supported Environments
 
+### GraphEnvs-Basic:
+
 | Environment      | Developed |  Action Space  |
 | :----: |    :----:   | :-------:|
 | Shortest Path      | ✅       | $v \in \mathcal{V}$   |
 | Steiner Tree   | ✅   | $e \in \mathcal{E}$      |
 | MST   | ✅  | $e \in \mathcal{E}$      |
 | MultiCast Routing   | :heavy_multiplication_x:   | $(e, m) \in \mathcal{E} \times \{1,2,..., M\}$ |
-| Minimum Vertex Cover   | ✅   | $v \in \mathcal{V}$ |
+| Minimum Vertex Cover  | ✅   | $v \in \mathcal{V}$ |
 | TSP   | ✅   | $v \in \mathcal{V}$ |
 | Longest Path   | :heavy_multiplication_x:   | $v \in \mathcal{V}$ |
 | Largest Clique   | :heavy_multiplication_x:   | $v \in \mathcal{V}$ |
-| Hamilton Path   | ✅   | $v \in \mathcal{V}$ |
 | Densest Subgraph   | :heavy_multiplication_x:  | $v \in \mathcal{V}$ |
-| Topological sorting   | :heavy_multiplication_x:  | $v \in \mathcal{V}$ |
+| Node Coloring  | :heavy_multiplication_x:  | $(v, c) \in \mathcal{E} \times \mathbb{Z} $ |
 
+### GraphEnvs-Extended:
+
+| Environment      | Developed |  Action Space  |
+| :----: |    :----:   | :-------:|
+| Public Transport Navigation  | :heavy_multiplication_x:   | - |
+| MultiCast Routing   | :heavy_multiplication_x:   | $(e, m) \in \mathcal{E} \times \{1,2,..., M\}$ |
+| Distribution Center Selection  | ✅   | $v \in \mathcal{V}$ |
+| Communication Network Design  | :heavy_multiplication_x: | - |
 
 
 1. **Shortest Path**: The goal is to find the shortest path from the source node to the target node. At each step, an edge is added to the path. The episode is over when we reach the target node.
