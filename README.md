@@ -48,7 +48,7 @@ for _ in range(5):
 | Longest Path   | :heavy_multiplication_x:   | $v \in \mathcal{V}$ |
 | Largest Clique   | :heavy_multiplication_x:   | $v \in \mathcal{V}$ |
 | Densest Subgraph   | :heavy_multiplication_x:  | $v \in \mathcal{V}$ |
-| Node Coloring  | :heavy_multiplication_x:  | $(v, c) \in \mathcal{E} \times \mathbb{Z} $ |
+| Node Coloring  | :heavy_multiplication_x:  | $(v, c) \in \mathcal{V} \times \mathbb{Z} $ |
 
 ### GraphEnvs-Extended:
 
