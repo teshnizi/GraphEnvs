@@ -13,44 +13,40 @@ from typing import Tuple
 
 class SteinerTreeEnv(gym.Env):
     '''
-    Environment for shortest path problem.
-    input:
-        - n_nodes: number of nodes in the graph
-        - n_edges: number of edges in the graph
-        - weighted: whether the graph is weighted or not
-        - n_dests: number of destinations to be reached
+    Environment for multicast routing problem.
     '''
     
-    def __init__(self, n_nodes, n_edges, n_dests=3, weighted=True, is_eval_env=False) -> None:
+    def __init__(self, n_nodes, n_edges=-1, n_dests=3, weighted=True, max_distance=-1, is_eval_env=False) -> None:
         super(SteinerTreeEnv, self).__init__()
         
         # Node status codes
-        # self.HAS_NOTHING = np.array([0.0], dtype=np.float32)
-        # self.HAS_MSG = np.array([2.0], dtype=np.float32)
-        # self.IS_TARGET = np.array([3.0], dtype=np.float32)
         self.NODE_HAS_MSG = 0
         self.NODE_IS_TARGET = 1
+        self.NODE_MAX_DISTANCE = 2
         
         # Edge status codes
-        # self.IS_NOT_TAKEN = np.array([1.0], dtype=np.float32)
-        # self.HAS_MSG = np.array([2.0], dtype=np.float32)
-        self.EDGE_IS_TAKEN = 1
         self.EDGE_WEIGHT = 0
+        self.EDGE_IS_TAKEN = 1
         
         self.n_nodes = n_nodes
+        if n_edges == -1:
+            n_edges = (n_nodes * (n_nodes - 1) // 2) * 0.30
+
         self.n_edges = n_edges
         self.n_dests = n_dests
         self.weighted = weighted
+        
+        #TODO: This should be a parameter
+        if max_distance == -1:
+            max_distance = np.log(n_nodes) * (1+0.3)/2
+            
+        self.max_distance = max_distance
+            
         self.action_space = gym.spaces.Discrete(n_edges)
-        # self.observation_space = gym.spaces.Box(low=0, high=1000, shape=(n_nodes+2*n_edges+2*n_edges*2,))
         self.observation_space = gym.spaces.Box(low=0, high=1000, shape=(2*n_nodes+2*n_edges*2+2*n_edges*2,))
-        # self.observation_space = gym.spaces.Graph(
-        #     node_space=gym.spaces.Box(low=0, high=4, shape=(1,)), 
-        #     edge_space=gym.spaces.Box(low=0, high=1, shape=(1,)),
-        #     )
+    
         self.is_eval_env = is_eval_env
         
-
     def reset(self, seed=None, options={}) -> np.array:
         super().reset(seed=seed)
         random.seed(seed)
@@ -73,23 +69,24 @@ class SteinerTreeEnv(gym.Env):
         # x = np.zeros((self.n_nodes, 1), dtype=np.float32) + self.HAS_NOTHING
         x = np.zeros((self.n_nodes, 2), dtype=np.float32)      
         
-        self.dests = np.random.choice(self.n_nodes, self.n_dests+1, replace=False)
+        self.src = 0
+        self.dests = np.random.choice(np.arange(1, self.n_nodes), size=self.n_dests, replace=False)
+        # self.src, self.dests = self.dests[0], self.dests[1:]
         
         self.approx_solution = 0
         
         if self.is_eval_env:
-            if self.n_dests == 1:
-                self.approx_solution = nx.algorithms.shortest_paths.generic.shortest_path_length(G, self.dests[0], self.dests[1], weight='delay')
-            elif self.n_dests == self.n_nodes - 1:
-                self.approx_solution = sum([features['delay'] for _, _, features in nx.minimum_spanning_edges(G, weight='delay')])
-                approx_solution_graph = nx.algorithms.approximation.steinertree.steiner_tree(G, self.dests, weight='delay', method='kou')  
-            else:
-                approx_solution_graph = nx.algorithms.approximation.steinertree.steiner_tree(G, self.dests, weight='delay', method='kou')  
-                self.approx_solution = sum([G[u][v]['delay'] for u, v in approx_solution_graph.edges()])
+            # if self.n_dests == 1:
+            #     self.approx_solution = nx.algorithms.shortest_paths.generic.shortest_path_length(G, self.dests[0], self.dests[1], weight='delay')
+            # elif self.n_dests == self.n_nodes - 1:
+            #     self.approx_solution = sum([features['delay'] for _, _, features in nx.minimum_spanning_edges(G, weight='delay')])
+            # else:
+            #     approx_solution_graph = nx.algorithms.approximation.steinertree.steiner_tree(G, self.dests, weight='delay', method='kou')  
+            #     self.approx_solution = sum([G[u][v]['delay'] for u, v in approx_solution_graph.edges()])
+            self.approx_solution = -1
             
         G = G.to_directed()
-        
-        self.src, self.dests = self.dests[0], self.dests[1:]
+        self.G = G
         
         
         x[self.src, self.NODE_HAS_MSG] = 1
@@ -101,7 +98,6 @@ class SteinerTreeEnv(gym.Env):
         edge_f = np.array([G[u][v]['delay'] for u, v in G.edges], dtype=np.float32).reshape(-1, 1)
        
         edge_f = np.concatenate((edge_f, np.zeros((2*self.n_edges, 1), dtype=np.float32)), axis=1)
-        
         
         self.graph = gym.spaces.GraphInstance(nodes=x, edges=edge_f, edge_links=edge_index)
         self.generated_solution = []
