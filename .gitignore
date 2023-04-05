@@ -8,3 +8,5 @@ main.py
 tests/__pycache__/
 .pytest_cache/
 graph.png
+graph_envs.egg-info/
+graph_envs/__pycache__/

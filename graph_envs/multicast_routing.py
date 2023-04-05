@@ -11,13 +11,14 @@ import random
 from typing import Tuple
 
 
-class SteinerTreeEnv(gym.Env):
+class MulticastRoutingEnv(gym.Env):
     '''
     Environment for multicast routing problem.
     '''
     
     def __init__(self, n_nodes, n_edges=-1, n_dests=3, weighted=True, max_distance=-1, is_eval_env=False) -> None:
-        super(SteinerTreeEnv, self).__init__()
+        super(MulticastRoutingEnv, self).__init__()
+        
         
         # Node status codes
         self.NODE_HAS_MSG = 0
@@ -46,6 +47,10 @@ class SteinerTreeEnv(gym.Env):
         self.observation_space = gym.spaces.Box(low=0, high=1000, shape=(2*n_nodes+2*n_edges*2+2*n_edges*2,))
     
         self.is_eval_env = is_eval_env
+        
+        self._metadata['num_node_features'] = 3
+        self._metadata['num_edge_features'] = 2
+                
         
     def reset(self, seed=None, options={}) -> np.array:
         super().reset(seed=seed)
@@ -76,13 +81,6 @@ class SteinerTreeEnv(gym.Env):
         self.approx_solution = 0
         
         if self.is_eval_env:
-            # if self.n_dests == 1:
-            #     self.approx_solution = nx.algorithms.shortest_paths.generic.shortest_path_length(G, self.dests[0], self.dests[1], weight='delay')
-            # elif self.n_dests == self.n_nodes - 1:
-            #     self.approx_solution = sum([features['delay'] for _, _, features in nx.minimum_spanning_edges(G, weight='delay')])
-            # else:
-            #     approx_solution_graph = nx.algorithms.approximation.steinertree.steiner_tree(G, self.dests, weight='delay', method='kou')  
-            #     self.approx_solution = sum([G[u][v]['delay'] for u, v in approx_solution_graph.edges()])
             self.approx_solution = -1
             
         G = G.to_directed()
