@@ -6,11 +6,15 @@ import networkx as nx
 import torch_geometric as pyg
 import matplotlib.pyplot as plt
 
+import importlib
+
 def devectorize_graph(vector, env_id, **kwargs):
     bs = vector.shape[0]
     node_f, edge_f, _ = get_env_info(env_id)
     p1 = kwargs['n_nodes'] * node_f
     p2 = p1 + 2*kwargs['n_edges'] * edge_f
+    
+    print(node_f, edge_f, p1, p2)
     
     x = vector[:, :p1].reshape(bs, kwargs['n_nodes'], node_f)
     edge_features = vector[:, p1:p2].reshape(bs, 2*kwargs['n_edges'], edge_f)
@@ -42,9 +46,18 @@ def get_env_info(env_id):
         node_f = 2
         edge_f = 1
         action_type = "node"
+    elif env_id == 'DistributionCenter-v0':
+        node_f = 5
+        edge_f = 1
+        action_type = "node"
+    elif env_id == 'MulticastRouting-v0':
+        node_f = 4
+        edge_f = 2
+        action_type = "edge"
+    else:
+        assert False, "Unknown env_id"
         
     return node_f, edge_f, action_type
-
 
 
 def show_graph(G):
@@ -55,3 +68,4 @@ def show_graph(G):
     
     # save to file:
     plt.savefig("graph.png")
+    
