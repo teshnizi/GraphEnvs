@@ -9,7 +9,7 @@ import networkx as nx
 import random
 
 from typing import Tuple
-
+from matplotlib import pyplot as plt
 
 class MulticastRoutingEnv(gym.Env):
     '''
@@ -23,10 +23,13 @@ class MulticastRoutingEnv(gym.Env):
     def get_mask_shape(self):
         return (self.n_edges,)
     
-    def __init__(self, n_nodes, n_edges=-1, n_dests=3, weighted=True, max_distance=-1, parenting='Advanced', is_eval_env=False) -> None:
+    def __init__(self, n_nodes, n_edges=-1, n_dests=3, weighted=True, max_distance=-1, parenting=4, is_eval_env=False) -> None:
         super(MulticastRoutingEnv, self).__init__()
         
+        if parenting not in [1,2,3,4]:
+            raise ValueError('Invalid parenting type')
         self.parenting = parenting
+        
         
         # Node status codes
         self.NODE_HAS_MSG = 0
@@ -103,12 +106,15 @@ class MulticastRoutingEnv(gym.Env):
                     assert (v, u) not in all_path_edges, "Wrong!"
                     all_path_edges.add((u, v))
             
-            
             self.approx_solution = sum([G[u][v]['delay'] for u, v in all_path_edges])
         
         
         G = G.to_directed()
         self.G = G
+        
+        # A tree that's used to keep track of distance of each node from the source given the partial tree
+        if self.parenting == 4:
+            self.alt_G = G.copy()
         
         x[self.src, self.NODE_HAS_MSG] = 1
         x[self.dests, self.NODE_IS_TARGET] = 1
@@ -144,11 +150,12 @@ class MulticastRoutingEnv(gym.Env):
     def _get_mask(self) -> np.array:
         # print('=========')
         mask = np.zeros((2 * self.n_edges,), dtype=bool) < 1.0
+
         mask[self.graph.nodes[self.graph.edge_links[:, 0], self.NODE_HAS_MSG] < 0.5] = False
         mask[self.graph.nodes[self.graph.edge_links[:, 1], self.NODE_HAS_MSG] > 0.5] = False
         
         # print('Pre: ', mask.nonzero()[0])
-        if self.parenting == 'Advanced':
+        if self.parenting >= 3:
             Vs = self.graph.edge_links[mask, 1]
             Vs = np.unique(Vs)
             mask[:] = False
@@ -170,34 +177,13 @@ class MulticastRoutingEnv(gym.Env):
                 mask[best_edge] = True
                 # print(f'V: {v}, Best edge: {self.graph.edge_links[best_edge]}')
             
-            # print('Post: ', mask.nonzero()[0])
-                
-                
-            # print('=====')
-            
-            # Remove the nodes already in the tree to get the remaining subgraph:
-            # removal_nodes = self.graph.nodes[:, self.NODE_HAS_MSG].nonzero()[0]
-            # sub_g = self.G.subgraph([n for n in self.G.nodes if n not in removal_nodes])
-            
-            # min_to_Vs = {}
-            # for d in self.dests:
-            #     if self.graph.nodes[d, self.NODE_HAS_MSG] > 0.5:
-            #         continue
-                
-            #     sps = nx.shortest_path_length(sub_g, source=d, weight='delay')    
-            #     min_to_Vs[d] = np.min([sps[v] + s_to_Vs[v] for v in Vs if v in sps])
-            
-            # if len(min_to_Vs) > 0:
-            #     if min(min_to_Vs.values()) > self.graph.nodes[self.src, self.NODE_MAX_DISTANCE]:
-            #         print('Blocked State!')
-            #         mask[:] = False
-    
         return mask
     
     
     def step(self, action: Tuple[int, int]) -> Tuple[gym.spaces.GraphInstance, SupportsFloat, bool, bool, dict]:
         
         u, v = self.graph.edge_links[action, 0], self.graph.edge_links[action, 1]
+        
         # print(f'Action: {action}, u: {u}, v: {v}')
         assert (u < self.n_nodes), f"Node {u} is out of bounds!"
         assert (v < self.n_nodes), f"Node {v} is out of bounds!"
@@ -221,15 +207,75 @@ class MulticastRoutingEnv(gym.Env):
                 + self.graph.edges[action, self.EDGE_DELAY]
         
         if self.graph.nodes[v, self.NODE_IS_TARGET] == 1:
-            if self.graph.nodes[v, self.NODE_DISTANCE_FROM_SOURCE] > self.graph.nodes[v, self.NODE_MAX_DISTANCE]:
+            if self.graph.nodes[v, self.NODE_DISTANCE_FROM_SOURCE] > self.graph.nodes[v, self.NODE_MAX_DISTANCE] + 1e-4:
                 reward -= 2*self.n_nodes
             else:
                 reward += 1
                 self.constraints_satisfied += 1
+        
+        
+        dests_left = np.logical_and(self.graph.nodes[:, self.NODE_HAS_MSG] < 1e-5, self.graph.nodes[:, self.NODE_IS_TARGET] > (1-1e-5) ).sum()
+        
+        
+        if self.parenting == 4:
+            
+            neighbors_of_v = list(self.alt_G.neighbors(v))
+            all_edges = set(self.alt_G.edges())
+            
+            # print(all_edges)
+            # print(f'V: {v}, Neighbors: {neighbors_of_v}')
+            assert 0 in neighbors_of_v, "BUG IN THE LIBRARY! Node 0 is not a neighbor of v!"
+            for w in neighbors_of_v:
+                if w == 0:
+                    continue
+                assert self.graph.nodes[w, self.NODE_HAS_MSG] < 0.5, "BUG IN THE LIBRARY! Node w is already a part of the tree!"
+                # print(f'W: {w}, Edge: {(0, w)}')
                 
+                if (0, w) in all_edges:
+                    self.alt_G.edges[0, w]['delay'] = np.minimum(\
+                        self.graph.nodes[v, self.NODE_DISTANCE_FROM_SOURCE] + self.alt_G.edges[v, w]['delay'],
+                        self.alt_G.edges[0, w]['delay'])
+                    self.alt_G.edges[w, 0]['delay'] = self.alt_G.edges[0, w]['delay']
+                    
+                    # print('Replace ', self.graph.nodes[v, self.NODE_DISTANCE_FROM_SOURCE], self.alt_G.edges[v, w]['delay'], self.alt_G.edges[0, w]['delay'])
+                else:
+                    # print('Make    ', self.graph.nodes[v, self.NODE_DISTANCE_FROM_SOURCE], self.alt_G.edges[v, w]['delay'])
+                    self.alt_G.add_edge(0, w, delay=self.graph.nodes[v, self.NODE_DISTANCE_FROM_SOURCE] + self.alt_G.edges[v, w]['delay'])
+                    self.alt_G.add_edge(w, 0, delay=self.graph.nodes[v, self.NODE_DISTANCE_FROM_SOURCE] + self.alt_G.edges[v, w]['delay'])
+            
+            # print('Done')
+            self.alt_G.remove_node(v)
+            
+            # print('===== Alt Graph =====')
+            # print('Nodes: ', self.alt_G.nodes.data())
+            # print('Edges: ', self.alt_G.edges.data())
+            
+            # draw_g = self.alt_G.copy()
+            # for e in draw_g.edges:
+            #     # print(G.edges[e], G.edges[e]['edge_attr'])
+            #     draw_g.edges[e]['delay'] = round(draw_g.edges[e]['delay'] * 10)/10
+            
+            # plt.figure(figsize=(10, 10))
+            # layout = nx.kamada_kawai_layout(draw_g)
+            # nx.draw(draw_g, pos=layout, with_labels=True)
+            # nx.draw_networkx_edge_labels(draw_g, pos=layout, edge_labels=nx.get_edge_attributes(draw_g, 'delay'), font_color='red')
+            # plt.savefig(f"graph_{v}.png")
+            
+            sps = nx.shortest_path_length(self.alt_G, 0, weight='delay')
+            # print('SPS: ', sps)
+            for d in self.dests:
+                if d in self.alt_G.nodes:
+                    if sps[d] > self.graph.nodes[d, self.NODE_MAX_DISTANCE] + 1e-5:
+                        # print('HELPED!')
+                        reward -= 2*self.n_nodes * dests_left
+                        done = True
+                        info['solved'] = False
+                        break
+            
         info['mask'] = self._get_mask()
         
-        if np.logical_and(self.graph.nodes[:, self.NODE_HAS_MSG] == 0, self.graph.nodes[:, self.NODE_IS_TARGET] == 1).sum() == 0:
+        
+        if dests_left == 0:
             done = True
             if self.constraints_satisfied == self.n_dests:
                 info['solved'] = True
@@ -237,19 +283,17 @@ class MulticastRoutingEnv(gym.Env):
                 info['solved'] = False
                 
         elif info['mask'].sum() == 0:
-            if self.parenting == 'Basic':
+            if self.parenting <= 1:
                 assert info['mask'].sum() > 0, "No more actions possible! Shouldn't happen!"
             else:
-                reward -= 2*self.n_nodes * self.n_dests
+                reward -= 2*self.n_nodes * dests_left
                 done = True
                 info['solved'] = False
             
             
-        
         if done:
             info['heuristic_solution'] = self.approx_solution
             info['solution_cost'] = self.solution_cost
-
+        
         
         return self._vectorize_graph(self.graph), reward, done, False, info
-    
