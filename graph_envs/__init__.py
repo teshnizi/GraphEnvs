@@ -12,6 +12,12 @@ register(
 )
 
 register(
+    id='LongestPath-v0',
+    entry_point='graph_envs.longest_path:LongestPathEnv',
+)
+
+
+register(
     id='SteinerTree-v0',
     entry_point='graph_envs.steiner_tree:SteinerTreeEnv',
 )

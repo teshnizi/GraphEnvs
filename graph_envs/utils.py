@@ -67,5 +67,6 @@ def show_graph(G):
     nx.draw_networkx_edge_labels(G, pos, edge_labels=nx.get_edge_attributes(G, 'delay'))
     
     # save to file:
-    plt.savefig("graph.png")
+    # plt.savefig("graph.png")
+    plt.show()
     
