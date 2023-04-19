@@ -10,3 +10,5 @@ tests/__pycache__/
 graph.png
 graph_envs.egg-info/
 graph_envs/__pycache__/
+*.png
+*.pdf
