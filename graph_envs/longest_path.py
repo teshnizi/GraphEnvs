@@ -18,12 +18,14 @@ class LongestPathEnv(gym.Env):
         - weighted: whether the graph is weighted or not
     '''
     
-    def __init__(self, n_nodes, n_edges, weighted=True, return_graph_obs=False, is_eval_env=False) -> None:
+    def __init__(self, n_nodes, n_edges, weighted=True, return_graph_obs=False, is_eval_env=False, parenting=-1) -> None:
         super(LongestPathEnv, self).__init__()
         
-        self.HAS_NOTHING = np.array([0.0], dtype=np.float32)
-        self.IS_TAKEN = np.array([1.0], dtype=np.float32)
-        self.IS_TARGET = np.array([1.0], dtype=np.float32)
+        assert parenting == -1, "Parenting not supported for LongestPathEnv"
+        self.NODE_HAS_MSG = 0
+        self.NODE_IS_TARGET = 1
+        
+        self.EDGE_WEIGHT = 0
         
         self.n_nodes = n_nodes
         if n_edges == -1:
@@ -64,10 +66,10 @@ class LongestPathEnv(gym.Env):
         
         G = G.to_directed()
         
-        x = np.zeros((self.n_nodes, 2), dtype=np.float32) + self.HAS_NOTHING
+        x = np.zeros((self.n_nodes, 2), dtype=np.float32)
         
         self.src, self.dest = np.random.choice(self.n_nodes, size=2, replace=False)
-        x[self.src, 0], x[self.dest, 1] = self.IS_TAKEN, self.IS_TARGET
+        x[self.src, self.NODE_HAS_MSG], x[self.dest, self.NODE_IS_TARGET] = 1, 1
         self.head = self.src
         self.adj = nx.adjacency_matrix(G, weight='delay').todense()
         
@@ -77,8 +79,8 @@ class LongestPathEnv(gym.Env):
         
         self.optimal_solution = 0
         if self.is_eval_env:
-            # self.optimal_solution = nx.shortest_path_length(G, source=self.src, target=self.dest, weight='delay')
-            self.optimal_solution = -1
+            self.optimal_solution = -nx.shortest_path_length(G, source=self.src, target=self.dest, weight='delay')
+            # self.optimal_solution = -1
         
         
         info = {'mask': self._get_mask()}
@@ -87,6 +89,9 @@ class LongestPathEnv(gym.Env):
             info['graph_obs'] = self.graph
         
         self.solution_cost = 0
+        self.edges_taken = []
+        
+
         return self._vectorize_graph(self.graph), info
     
     def _vectorize_graph(self, graph):
@@ -100,7 +105,7 @@ class LongestPathEnv(gym.Env):
     def _get_mask(self) -> np.array:
         mask = np.zeros((self.n_nodes,), dtype=bool)
         mask[self._get_neighbors(self.head)] = 1
-        mask[self.graph.nodes[:, 0] == self.IS_TAKEN] = 0
+        mask[self.graph.nodes[:, self.NODE_HAS_MSG] == 1] = 0
         return mask
     
     def step(self, action: int) -> Tuple[gym.spaces.GraphInstance, SupportsFloat, bool, bool, dict]:
@@ -108,22 +113,21 @@ class LongestPathEnv(gym.Env):
         assert self._get_mask()[action] == True, f"Mask of {action} is False!"
 
         assert action in self._get_neighbors(self.head), f"Node {action} is not a neighbor of the current path head {self.head}!"
-        assert np.isclose(self.graph.nodes[action, 0], self.IS_TAKEN) == False, f"Node {action} is already a part of the path!"
-        
+        assert np.isclose(self.graph.nodes[action, self.NODE_HAS_MSG], 1) == False, f"Node {action} is already a part of the path!"
         
         
         done = False
         reward = self.adj[self.head, action]
         self.solution_cost -= reward
+        self.edges_taken.append((self.head, action))
         info = {}
         
-        if np.isclose(self.graph.nodes[action, 1], self.IS_TARGET):
-            # reward += self.n_nodes
+        if np.isclose(self.graph.nodes[action, self.NODE_IS_TARGET], 1):
             done = True
             info['solved'] = True
         
         
-        self.graph.nodes[action, 0] = self.IS_TAKEN
+        self.graph.nodes[action, self.NODE_HAS_MSG] = 1
         self.head = action
         
         info['mask'] = self._get_mask()
@@ -135,5 +139,7 @@ class LongestPathEnv(gym.Env):
         if done:
             info['heuristic_solution'] = self.optimal_solution
             info['solution_cost'] = self.solution_cost
+            info['edges_taken'] = self.edges_taken
+            
         return self._vectorize_graph(self.graph), reward, done, False, info
         

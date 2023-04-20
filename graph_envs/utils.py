@@ -14,8 +14,6 @@ def devectorize_graph(vector, env_id, **kwargs):
     p1 = kwargs['n_nodes'] * node_f
     p2 = p1 + 2*kwargs['n_edges'] * edge_f
     
-    print(node_f, edge_f, p1, p2)
-    
     x = vector[:, :p1].reshape(bs, kwargs['n_nodes'], node_f)
     edge_features = vector[:, p1:p2].reshape(bs, 2*kwargs['n_edges'], edge_f)
     edge_index = vector[:, p2:].reshape(bs, 2*kwargs['n_edges'], 2).long()
@@ -54,6 +52,10 @@ def get_env_info(env_id):
         node_f = 4
         edge_f = 2
         action_type = "edge"
+    elif env_id == 'LongestPath-v0':
+        node_f = 2
+        edge_f = 1
+        action_type = "node"
     else:
         assert False, "Unknown env_id"
         
