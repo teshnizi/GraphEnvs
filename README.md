@@ -42,10 +42,9 @@ for _ in range(5):
 | Shortest Path      | ✅       | $v \in \mathcal{V}$   |
 | Steiner Tree   | ✅   | $e \in \mathcal{E}$      |
 | MST   | ✅  | $e \in \mathcal{E}$      |
-| MultiCast Routing   | :heavy_multiplication_x:   | $(e, m) \in \mathcal{E} \times \{1,2,..., M\}$ |
 | Minimum Vertex Cover  | ✅   | $v \in \mathcal{V}$ |
 | TSP   | ✅   | $v \in \mathcal{V}$ |
-| Longest Path   | :heavy_multiplication_x:   | $v \in \mathcal{V}$ |
+| Longest Path   | ✅   | $v \in \mathcal{V}$ |
 | Largest Clique   | :heavy_multiplication_x:   | $v \in \mathcal{V}$ |
 | Densest Subgraph   | :heavy_multiplication_x:  | $v \in \mathcal{V}$ |
 | Node Coloring  | :heavy_multiplication_x:  | $(v, c) \in \mathcal{V} \times \mathbb{Z} $ |
@@ -55,7 +54,7 @@ for _ in range(5):
 | Environment      | Developed |  Action Space  |
 | :----: |    :----:   | :-------:|
 | Public Transport Navigation  | :heavy_multiplication_x:   | - |
-| MultiCast Routing   | :heavy_multiplication_x:   | $(e, m) \in \mathcal{E} \times \{1,2,..., M\}$ |
+| MultiCast Routing   | ✅   | $(e, m) \in \mathcal{E} \times \{1,2,..., M\}$ |
 | Distribution Center Selection  | ✅   | $v \in \mathcal{V}$ |
 | Communication Network Design  | :heavy_multiplication_x: | - |
 
