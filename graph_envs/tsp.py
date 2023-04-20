@@ -36,9 +36,11 @@ class TSPEnv(gym.Env):
         
     def reset(self, seed=None, options={}) -> np.array:
         
-        super().reset(seed=seed)
-        random.seed(seed)
-        np.random.seed(seed)
+        if seed != None:
+            super().reset(seed=seed)
+            random.seed(seed)
+            np.random.seed(seed)
+        
         
         while True:
             G = nx.gnm_random_graph(self.n_nodes, self.n_edges)

@@ -1,5 +1,5 @@
 import gymnasium as gym
-# import torch 
+import torch 
 # import torch_geometric as pyg 
 import numpy as np 
 
@@ -21,7 +21,9 @@ class LongestPathEnv(gym.Env):
     def __init__(self, n_nodes, n_edges, weighted=True, return_graph_obs=False, is_eval_env=False, parenting=-1) -> None:
         super(LongestPathEnv, self).__init__()
         
-        assert parenting == -1, "Parenting not supported for LongestPathEnv"
+        assert parenting in [1,2,3]
+        
+        
         self.NODE_HAS_MSG = 0
         self.NODE_IS_TARGET = 1
         
@@ -34,6 +36,7 @@ class LongestPathEnv(gym.Env):
         self.n_edges = n_edges
         self.weighted = weighted
         self.action_space = gym.spaces.Discrete(n_nodes)
+        self.parenting = parenting
         # self.observation_space = gym.spaces.Box(low=-1., high=11., shape=(2, n_nodes, n_nodes))        
         # self.observation_space = gym.spaces.Graph(
         #     node_space=gym.spaces.Box(low=0, high=4, shape=(1,)), 
@@ -43,11 +46,16 @@ class LongestPathEnv(gym.Env):
         self.return_graph_obs = return_graph_obs
         self.solution_cost = 0
         self.is_eval_env = is_eval_env
-        
+
     def reset(self, seed=None, options={}) -> np.array:
-        super().reset(seed=seed)
-        random.seed(seed)
-        np.random.seed(seed)
+        
+        
+        if seed != None:
+            super().reset(seed=seed)
+            random.seed(seed)
+            np.random.seed(seed)
+        
+        
         
         while True:
             G = nx.gnm_random_graph(self.n_nodes, self.n_edges)
@@ -65,6 +73,8 @@ class LongestPathEnv(gym.Env):
             d['delay'] = delay[u, v]
         
         G = G.to_directed()
+        if self.parenting >= 2:
+            self.alt_G = G.copy()
         
         x = np.zeros((self.n_nodes, 2), dtype=np.float32)
         
@@ -106,6 +116,12 @@ class LongestPathEnv(gym.Env):
         mask = np.zeros((self.n_nodes,), dtype=bool)
         mask[self._get_neighbors(self.head)] = 1
         mask[self.graph.nodes[:, self.NODE_HAS_MSG] == 1] = 0
+        
+        if self.parenting == 3:
+            for k in range(self.n_nodes):
+                if mask[k] == True:
+                    if not nx.has_path(self.alt_G, k, self.dest):
+                        mask[k] = False
         return mask
     
     def step(self, action: int) -> Tuple[gym.spaces.GraphInstance, SupportsFloat, bool, bool, dict]:
@@ -121,12 +137,20 @@ class LongestPathEnv(gym.Env):
         self.solution_cost -= reward
         self.edges_taken.append((self.head, action))
         info = {}
+        info['heuristic_solution'] = self.optimal_solution
         
         if np.isclose(self.graph.nodes[action, self.NODE_IS_TARGET], 1):
             done = True
             info['solved'] = True
         
-        
+        elif self.parenting >= 2:
+            self.alt_G.remove_node(self.head)
+            if self.parenting == 2:
+                if not nx.has_path(self.alt_G, action, self.dest):
+                    done = True
+                    reward = -2*self.n_nodes
+                    info['solved'] = False
+                
         self.graph.nodes[action, self.NODE_HAS_MSG] = 1
         self.head = action
         
@@ -137,7 +161,7 @@ class LongestPathEnv(gym.Env):
             info['solved'] = False
             
         if done:
-            info['heuristic_solution'] = self.optimal_solution
+            
             info['solution_cost'] = self.solution_cost
             info['edges_taken'] = self.edges_taken
             
