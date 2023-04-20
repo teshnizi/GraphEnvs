@@ -54,9 +54,8 @@ for _ in range(5):
 | Environment      | Developed |  Action Space  |
 | :----: |    :----:   | :-------:|
 | Public Transport Navigation  | :heavy_multiplication_x:   | - |
-| MultiCast Routing   | ✅   | $(e, m) \in \mathcal{E} \times \{1,2,..., M\}$ |
+| MultiCast Routing   | ✅   | $e \in \mathcal{E}|
 | Distribution Center Selection  | ✅   | $v \in \mathcal{V}$ |
-| Communication Network Design  | :heavy_multiplication_x: | - |
 
 
 1. **Shortest Path**: The goal is to find the shortest path from the source node to the target node. At each step, an edge is added to the path. The episode is over when we reach the target node.
