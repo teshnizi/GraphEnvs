@@ -17,7 +17,6 @@ def devectorize_graph(vector, env_id, **kwargs):
     x = vector[:, :p1].reshape(bs, kwargs['n_nodes'], node_f)
     edge_features = vector[:, p1:p2].reshape(bs, 2*kwargs['n_edges'], edge_f)
     edge_index = vector[:, p2:].reshape(bs, 2*kwargs['n_edges'], 2).long()
-    
     return x, edge_features, edge_index
     
 
@@ -54,6 +53,10 @@ def get_env_info(env_id):
         action_type = "edge"
     elif env_id == 'LongestPath-v0':
         node_f = 2
+        edge_f = 1
+        action_type = "node"
+    elif env_id == 'DensestSubgraph-v0':
+        node_f = 1
         edge_f = 1
         action_type = "node"
     else:

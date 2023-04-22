@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, Generic, SupportsFloat, TypeVar, Tuple
 
 import networkx as nx 
 import random
-import matplotlib.pyplot as plt
 
 class DensestSubgraphEnv(gym.Env):
     '''
@@ -37,7 +36,7 @@ class DensestSubgraphEnv(gym.Env):
         self.action_space = gym.spaces.Discrete(n_nodes)
         self.parenting = parenting
        
-        self.observation_space = gym.spaces.Box(low=0, high=1000, shape=(2*n_nodes+2*n_edges+2*n_edges*2,))
+        self.observation_space = gym.spaces.Box(low=0, high=1000, shape=(n_nodes+2*n_edges+2*n_edges*2,))
         self.return_graph_obs = return_graph_obs
         self.solution_cost = 0
         self.is_eval_env = is_eval_env
@@ -57,15 +56,10 @@ class DensestSubgraphEnv(gym.Env):
         # separate node 0 from the rest of the graph:
         G.add_node(self.n_nodes-1)
         
-        plt.figure(figsize=(5,5))
-        nx.draw(G, with_labels=True)
-        plt.savefig('graph.png')
-        
         for v in G.nodes:
             G.nodes[v]['value'] = 1.0
             
         G.nodes[0]['value'] = 0.0
-        
         G = G.to_directed()
         
         x = np.zeros((self.n_nodes, 1), dtype=np.float32)
@@ -81,14 +75,12 @@ class DensestSubgraphEnv(gym.Env):
             self.optimal_solution = -1
         
         info = {'mask': self._get_mask()}
-        
         if self.return_graph_obs:
             info['graph_obs'] = self.graph
         
         self.solution_cost = 0
         self.nodes_taken = set()
         self.edge_taken_cnt = 0
-        
         
         return self._vectorize_graph(self.graph), info
     
