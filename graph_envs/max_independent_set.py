@@ -35,7 +35,7 @@ class MaxIndependentSet(gym.Env):
         
         
     def reset(self, seed=None, options={}) -> np.array:
-                if seed != None:
+        if seed != None:
             super().reset(seed=seed)
             random.seed(seed)
             np.random.seed(seed)

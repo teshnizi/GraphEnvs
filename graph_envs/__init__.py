@@ -42,3 +42,9 @@ register(
     id='MulticastRouting-v0',
     entry_point='graph_envs.multicast_routing:MulticastRoutingEnv',
 )
+
+
+register(
+    id='DensestSubgraph-v0',
+    entry_point='graph_envs.densest_subgraph:DensestSubgraphEnv',
+)

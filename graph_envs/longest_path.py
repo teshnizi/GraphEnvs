@@ -21,7 +21,10 @@ class LongestPathEnv(gym.Env):
     def __init__(self, n_nodes, n_edges, weighted=True, return_graph_obs=False, is_eval_env=False, parenting=-1) -> None:
         super(LongestPathEnv, self).__init__()
         
-        assert parenting in [1,2,3]
+        assert parenting in [0,1,2]
+        # 0: no parenting
+        # 1: Removing nodes that are not connected to the head
+        # 2: Removing nodes that have no path to the destination in the residual graph
         
         
         self.NODE_HAS_MSG = 0
@@ -56,7 +59,6 @@ class LongestPathEnv(gym.Env):
             np.random.seed(seed)
         
         
-        
         while True:
             G = nx.gnm_random_graph(self.n_nodes, self.n_edges)
             if nx.is_connected(G):
@@ -80,6 +82,10 @@ class LongestPathEnv(gym.Env):
         
         self.src, self.dest = np.random.choice(self.n_nodes, size=2, replace=False)
         x[self.src, self.NODE_HAS_MSG], x[self.dest, self.NODE_IS_TARGET] = 1, 1
+        
+        if self.parenting == 0:
+            x[self.src, self.NODE_IS_TARGET] = 2
+            
         self.head = self.src
         self.adj = nx.adjacency_matrix(G, weight='delay').todense()
         
@@ -91,7 +97,6 @@ class LongestPathEnv(gym.Env):
         if self.is_eval_env:
             self.optimal_solution = -nx.shortest_path_length(G, source=self.src, target=self.dest, weight='delay')
             # self.optimal_solution = -1
-        
         
         info = {'mask': self._get_mask()}
         
@@ -114,56 +119,65 @@ class LongestPathEnv(gym.Env):
         
     def _get_mask(self) -> np.array:
         mask = np.zeros((self.n_nodes,), dtype=bool)
-        mask[self._get_neighbors(self.head)] = 1
-        mask[self.graph.nodes[:, self.NODE_HAS_MSG] == 1] = 0
         
-        if self.parenting == 3:
-            for k in range(self.n_nodes):
-                if mask[k] == True:
-                    if not nx.has_path(self.alt_G, k, self.dest):
-                        mask[k] = False
+        if self.parenting == 0:
+            mask[:] = 1
+        else:
+            mask[self._get_neighbors(self.head)] = 1
+            mask[self.graph.nodes[:, self.NODE_HAS_MSG] == 1] = 0
+            
+            if self.parenting == 2:
+                for k in range(self.n_nodes):
+                    if mask[k] == True:
+                        if not nx.has_path(self.alt_G, k, self.dest):
+                            mask[k] = False
         return mask
     
     def step(self, action: int) -> Tuple[gym.spaces.GraphInstance, SupportsFloat, bool, bool, dict]:
+        
         assert (action < self.n_nodes), f"Node {action} is out of bounds!"
         assert self._get_mask()[action] == True, f"Mask of {action} is False!"
 
-        assert action in self._get_neighbors(self.head), f"Node {action} is not a neighbor of the current path head {self.head}!"
-        assert np.isclose(self.graph.nodes[action, self.NODE_HAS_MSG], 1) == False, f"Node {action} is already a part of the path!"
+        if self.parenting >= 1:
+            assert action in self._get_neighbors(self.head), f"Node {action} is not a neighbor of the current path head {self.head}!"
+            assert np.isclose(self.graph.nodes[action, self.NODE_HAS_MSG], 1) == False, f"Node {action} is already a part of the path!"
         
         
         done = False
         reward = self.adj[self.head, action]
         self.solution_cost -= reward
         self.edges_taken.append((self.head, action))
+        
+        
         info = {}
         info['heuristic_solution'] = self.optimal_solution
+        info['solution_cost'] = self.solution_cost
+        info['edges_taken'] = self.edges_taken
+            
+        # Taking a node that's not connected to the head or taking the same node twice
+        if not action in self._get_neighbors(self.head) or np.isclose(self.graph.nodes[action, self.NODE_HAS_MSG], 1):
+            done = True
+            info['solved'] = False
+            reward = -2*self.n_nodes
+            return self._vectorize_graph(self.graph), reward, done, False, info
+            
+        if self.parenting >= 2:
+            self.alt_G.remove_node(self.head)
+            
+        # Update the environment
+        self.head = action
+        self.graph.nodes[action, self.NODE_HAS_MSG] = 1
+        
+        info['mask'] = self._get_mask()
         
         if np.isclose(self.graph.nodes[action, self.NODE_IS_TARGET], 1):
             done = True
             info['solved'] = True
-        
-        elif self.parenting >= 2:
-            self.alt_G.remove_node(self.head)
-            if self.parenting == 2:
-                if not nx.has_path(self.alt_G, action, self.dest):
-                    done = True
-                    reward = -2*self.n_nodes
-                    info['solved'] = False
-                
-        self.graph.nodes[action, self.NODE_HAS_MSG] = 1
-        self.head = action
-        
-        info['mask'] = self._get_mask()
-        if (not done) and (info['mask'].sum() == 0):
+            
+        elif (info['mask'].sum() == 0):
             done = True
             reward = -2*self.n_nodes
             info['solved'] = False
-            
-        if done:
-            
-            info['solution_cost'] = self.solution_cost
-            info['edges_taken'] = self.edges_taken
             
         return self._vectorize_graph(self.graph), reward, done, False, info
         
