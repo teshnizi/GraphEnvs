@@ -8,6 +8,11 @@ from typing import TYPE_CHECKING, Any, Generic, SupportsFloat, TypeVar, Tuple
 import networkx as nx 
 import random
 
+
+from graph_envs.utils import vectorize_graph
+import graph_envs.feature_extraction as fe
+
+
 class DensestSubgraphEnv(gym.Env):
     '''
     Environment for longest path problem.
@@ -39,7 +44,7 @@ class DensestSubgraphEnv(gym.Env):
         self.action_space = gym.spaces.Discrete(n_nodes)
         self.parenting = parenting
        
-        self.observation_space = gym.spaces.Box(low=0, high=1000, shape=(n_nodes+2*n_edges+2*n_edges*2,))
+        self.observation_space = gym.spaces.Box(low=0, high=1000, shape=((1+fe.get_num_features())*n_nodes+2*n_edges+2*n_edges*2,))
         self.return_graph_obs = return_graph_obs
         self.solution_cost = 0
         self.is_eval_env = is_eval_env
@@ -65,7 +70,12 @@ class DensestSubgraphEnv(gym.Env):
         G.nodes[0]['value'] = 0.0
         G = G.to_directed()
         
-        x = np.zeros((self.n_nodes, 1), dtype=np.float32)
+        x = np.zeros((self.n_nodes, 1 + fe.get_num_features()), dtype=np.float32)
+        # Adding structural features
+        sf = fe.generate_features(G)
+        x[:, -fe.get_num_features():] = sf
+        
+        
         edge_f = np.ones((2*self.n_edges, 1), dtype=np.float32)
         edge_index = np.array(list(G.edges))
         
@@ -85,11 +95,9 @@ class DensestSubgraphEnv(gym.Env):
         self.nodes_taken = set()
         self.edge_taken_cnt = 0
         
-        return self._vectorize_graph(self.graph), info
+        return vectorize_graph(self.graph), info
     
-    def _vectorize_graph(self, graph):
-        return np.concatenate((graph.nodes.flatten(), graph.edges.flatten(), graph.edge_links.flatten()), dtype=np.float32)
-    
+  
     def _get_neighbors(self, node):
         neigbors = self.graph.edge_links[self.graph.edge_links[:, 0] == node, 1]
         return neigbors
@@ -143,7 +151,7 @@ class DensestSubgraphEnv(gym.Env):
             info['nodes_taken'] = self.nodes_taken
             info['solution_cost'] = self.solution_cost
             info['mask'] = self._get_mask()
-            return self._vectorize_graph(self.graph), reward, done, False, info
+            return vectorize_graph(self.graph), reward, done, False, info
         
         new_edges = 0
         
@@ -185,5 +193,5 @@ class DensestSubgraphEnv(gym.Env):
             info['nodes_taken'] = self.nodes_taken
             info['solution_cost'] = self.solution_cost
             
-        return self._vectorize_graph(self.graph), reward, done, False, info
+        return vectorize_graph(self.graph), reward, done, False, info
         

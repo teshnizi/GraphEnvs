@@ -9,6 +9,11 @@ import networkx as nx
 import random
 
 
+from graph_envs.utils import vectorize_graph
+import graph_envs.feature_extraction as fe
+
+
+
 class LongestPathEnv(gym.Env):
     '''
     Environment for longest path problem.
@@ -40,7 +45,7 @@ class LongestPathEnv(gym.Env):
         self.weighted = weighted
         self.action_space = gym.spaces.Discrete(n_nodes)
         self.parenting = parenting
-        self.observation_space = gym.spaces.Box(low=0, high=1000, shape=(2*n_nodes+2*n_edges+2*n_edges*2,))
+        self.observation_space = gym.spaces.Box(low=0, high=1000, shape=((2+fe.get_num_features())*n_nodes+2*n_edges+2*n_edges*2,))
         self.return_graph_obs = return_graph_obs
         self.solution_cost = 0
         self.is_eval_env = is_eval_env
@@ -71,13 +76,17 @@ class LongestPathEnv(gym.Env):
         
         G = G.to_directed()
         
-        x = np.zeros((self.n_nodes, 2), dtype=np.float32)
+        x = np.zeros((self.n_nodes, 2 + fe.get_num_features()), dtype=np.float32)
         
         self.src, self.dest = np.random.choice(self.n_nodes, size=2, replace=False)
         x[self.src, self.NODE_HAS_MSG], x[self.dest, self.NODE_IS_TARGET] = 1, 1
         
         if self.parenting == 0:
             x[self.src, self.NODE_IS_TARGET] = 2
+        
+        # Adding structural features
+        sf = fe.generate_features(G)
+        x[:, -fe.get_num_features():] = sf
         
         if self.parenting >= 2:
             self.alt_G = G.copy()
@@ -104,7 +113,7 @@ class LongestPathEnv(gym.Env):
         self.edges_taken = []
         
 
-        return self._vectorize_graph(self.graph), info
+        return vectorize_graph(self.graph), info
     
     def _vectorize_graph(self, graph):
         return np.concatenate((graph.nodes.flatten(), graph.edges.flatten(), graph.edge_links.flatten()), dtype=np.float32)
@@ -158,7 +167,7 @@ class LongestPathEnv(gym.Env):
             done = True
             info['solved'] = False
             reward = -2*self.n_nodes
-            return self._vectorize_graph(self.graph), reward, done, False, info
+            return vectorize_graph(self.graph), reward, done, False, info
             
 
         # Update the environment
@@ -181,5 +190,5 @@ class LongestPathEnv(gym.Env):
                 reward = -2*self.n_nodes
                 info['solved'] = False
             
-        return self._vectorize_graph(self.graph), reward, done, False, info
+        return vectorize_graph(self.graph), reward, done, False, info
         

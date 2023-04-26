@@ -8,6 +8,11 @@ import networkx as nx
 
 from typing import Tuple, SupportsFloat
 
+
+from graph_envs.utils import vectorize_graph
+import graph_envs.feature_extraction as fe
+
+
 class DistributionCenterEnv(gym.Env):
     '''
     Environment for shortest path problem.
@@ -21,10 +26,10 @@ class DistributionCenterEnv(gym.Env):
         return np.array(list(nx.single_source_dijkstra_path_length(G, node, cutoff=distance, weight='delay').keys()))
         
         
-    def __init__(self, n_nodes, n_edges, weighted=True, max_distance=1, target_count=-1, return_graph_obs=False, is_eval_env=False, parenting='Advanced') -> None:
+    def __init__(self, n_nodes, n_edges, weighted=True, max_distance=1, target_count=-1, return_graph_obs=False, is_eval_env=False, parenting=2) -> None:
         super(DistributionCenterEnv, self).__init__()
         
-        assert parenting in ['Basic', 'Advanced']
+        assert parenting in [1, 2]
         
         self.NODE_WEIGHT = 0
         self.NODE_IS_TAKEN = 1
@@ -48,7 +53,7 @@ class DistributionCenterEnv(gym.Env):
         self.action_space = gym.spaces.Discrete(n_nodes)
         
         self.return_graph_obs = return_graph_obs
-        self.observation_space = gym.spaces.Box(low=0, high=1000, shape=(5*n_nodes+2*n_edges+2*n_edges*2,))
+        self.observation_space = gym.spaces.Box(low=0, high=1000, shape=((5+fe.get_num_features())*n_nodes+2*n_edges+2*n_edges*2,))
         self.is_eval_env = is_eval_env
         
         
@@ -89,10 +94,15 @@ class DistributionCenterEnv(gym.Env):
         self.nx_graph = G
         
         
-        x = np.zeros((self.n_nodes, 5), dtype=np.float32)
+        x = np.zeros((self.n_nodes, 5 + fe.get_num_features()), dtype=np.float32)
         x[:, self.NODE_WEIGHT] = cost
         x[targets, self.NODE_IS_TARGET] = 1
         x[:, self.NODE_MAX_DISTANCE] = self.max_distance
+        
+        # Adding structural features
+        sf = fe.generate_features(G)
+        x[:, -fe.get_num_features():] = sf
+        
         
         
         edge_index = np.array(list(G.edges))
@@ -113,17 +123,14 @@ class DistributionCenterEnv(gym.Env):
             info['graph_obs'] = self.graph
         
         self.solution_cost = 0
-        return self._vectorize_graph(self.graph), info
+        return vectorize_graph(self.graph), info
     
-    
-    def _vectorize_graph(self, graph):
-        return np.concatenate((graph.nodes.flatten(), graph.edges.flatten(), graph.edge_links.flatten()), dtype=np.float32)
     
     def _get_mask(self) -> np.array:
         
         mask = np.zeros((self.n_nodes,), dtype=bool)
         targets_left = np.logical_and(self.graph.nodes[:, self.NODE_IS_TARGET] == 1, self.graph.nodes[:, self.NODE_IS_COVERED] == 0).nonzero()[0]
-        if self.parenting == 'Advanced':
+        if self.parenting == 2:
             for t in targets_left:
                 mask[self.in_range_dict[t]] = True
         else:
@@ -164,7 +171,7 @@ class DistributionCenterEnv(gym.Env):
         if done:
             info['heuristic_solution'] = self.approx_solution
             info['solution_cost'] = self.solution_cost
-        return self._vectorize_graph(self.graph), reward, done, False, info
+        return vectorize_graph(self.graph), reward, done, False, info
           
         
         

@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Any, Generic, SupportsFloat, TypeVar, Tuple
 
 import networkx as nx 
 import random
-
+from graph_envs.utils import vectorize_graph
+import graph_envs.feature_extraction as fe
 
 class TSPEnv(gym.Env):
     '''
@@ -29,7 +30,7 @@ class TSPEnv(gym.Env):
         self.weighted = weighted
         
         self.action_space = gym.spaces.Discrete(n_nodes)
-        self.observation_space = gym.spaces.Box(low=0, high=1000, shape=(2*n_nodes+2*n_edges+2*n_edges*2,))
+        self.observation_space = gym.spaces.Box(low=0, high=1000, shape=((1 + fe.get_num_features()) *n_nodes+2*n_edges+2*n_edges*2,))
         
         self.return_graph_obs = return_graph_obs
         self.is_eval_env = is_eval_env
@@ -52,7 +53,7 @@ class TSPEnv(gym.Env):
         else:
             delay = np.random.randint(1, 2, size=(self.n_nodes, self.n_nodes))/1.0
             
-        
+            
         for u, v, d in G.edges(data=True):
             d['weight'] = delay[u, v]
         
@@ -65,13 +66,15 @@ class TSPEnv(gym.Env):
             
         G = G.to_directed()
         
-        x = np.zeros((self.n_nodes, 2), dtype=np.float32)
+        x = np.zeros((self.n_nodes, 1+fe.get_num_features()), dtype=np.float32)
         
         self.head = 0
         x[self.head, self.NODE_TAKEN] = 1
         
-        # adding node degrees as a feature:
-        x[:, 1] = [G.degree[i] for i in range(self.n_nodes)]
+        
+        # Adding structural features
+        sf = fe.generate_features(G)
+        x[:, -fe.get_num_features():] = sf
         
         self.adj = nx.adjacency_matrix(G, weight='weight').todense()
         
@@ -88,10 +91,10 @@ class TSPEnv(gym.Env):
             info['graph_obs'] = self.graph
         
 
-        return self._vectorize_graph(self.graph), info
+        return vectorize_graph(self.graph), info
     
-    def _vectorize_graph(self, graph):
-        return np.concatenate((graph.nodes.flatten(), graph.edges.flatten(), graph.edge_links.flatten()), dtype=np.float32)
+    # def _vectorize_graph(self, graph):
+    #     return np.concatenate((graph.nodes.flatten(), graph.edges.flatten(), graph.edge_links.flatten()), dtype=np.float32)
     
     
     def _get_neighbors(self, node):
@@ -148,5 +151,5 @@ class TSPEnv(gym.Env):
             info['solution_cost'] = self.total_solution_cost
            
            
-        return self._vectorize_graph(self.graph), reward, done, False, info
+        return vectorize_graph(self.graph), reward, done, False, info
         

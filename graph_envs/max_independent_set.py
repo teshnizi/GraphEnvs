@@ -8,6 +8,11 @@ import networkx as nx
 
 from typing import Tuple, SupportsFloat
 
+
+from graph_envs.utils import vectorize_graph
+import graph_envs.feature_extraction as fe
+
+
 class MaxIndependentSet(gym.Env):
     '''
     Environment for shortest path problem.
@@ -20,7 +25,6 @@ class MaxIndependentSet(gym.Env):
     def __init__(self, n_nodes, n_edges, weighted=True, return_graph_obs=False, is_eval_env=False) -> None:
         super(MaxIndependentSet, self).__init__()
         
-        
         self.NODE_WEIGHT = 0
         self.NODE_IS_TAKEN = 1
         
@@ -30,7 +34,7 @@ class MaxIndependentSet(gym.Env):
         self.action_space = gym.spaces.Discrete(n_nodes)
         
         self.return_graph_obs = return_graph_obs
-        self.observation_space = gym.spaces.Box(low=0, high=1000, shape=(2*n_nodes+2*n_edges+2*n_edges*2,))
+        self.observation_space = gym.spaces.Box(low=0, high=1000, shape=((2+fe.get_num_features())*n_nodes+2*n_edges+2*n_edges*2,))
         self.is_eval_env = is_eval_env
         
         
@@ -64,9 +68,12 @@ class MaxIndependentSet(gym.Env):
             
         G = G.to_directed()
         
-        x = np.zeros((self.n_nodes, 2), dtype=np.float32)
+        x = np.zeros((self.n_nodes, 2 + fe.get_num_features()), dtype=np.float32)
         x[:, self.NODE_WEIGHT] = cost
         
+        # Adding structural features
+        sf = fe.generate_features(G)
+        x[:, -fe.get_num_features():] = sf
         
         edge_index = np.array(list(G.edges))
         edge_f = np.array([1.0 for u, v in G.edges], dtype=np.float32).reshape(-1, 1)
@@ -79,11 +86,8 @@ class MaxIndependentSet(gym.Env):
             info['graph_obs'] = self.graph
         
         self.solution_cost = 0
-        return self._vectorize_graph(self.graph), info
+        return vectorize_graph(self.graph), info
     
-    
-    def _vectorize_graph(self, graph):
-        return np.concatenate((graph.nodes.flatten(), graph.edges.flatten(), graph.edge_links.flatten()), dtype=np.float32)
     
     def _get_mask(self) -> np.array:
         
@@ -117,7 +121,7 @@ class MaxIndependentSet(gym.Env):
             info['heuristic_solution'] = self.approx_solution
             info['solution_cost'] = self.solution_cost
         
-        return self._vectorize_graph(self.graph), reward, done, False, info
+        return vectorize_graph(self.graph), reward, done, False, info
           
         
         

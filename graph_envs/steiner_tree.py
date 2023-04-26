@@ -10,6 +10,8 @@ import random
 
 from typing import Tuple
 
+from graph_envs.utils import vectorize_graph
+import graph_envs.feature_extraction as fe
 
 class SteinerTreeEnv(gym.Env):
     '''
@@ -21,19 +23,16 @@ class SteinerTreeEnv(gym.Env):
         - n_dests: number of destinations to be reached
     '''
     
-    def __init__(self, n_nodes, n_edges, n_dests=3, weighted=True, is_eval_env=False) -> None:
+    def __init__(self, n_nodes, n_edges, n_dests=3, weighted=True, parenting=-1, is_eval_env=False) -> None:
         super(SteinerTreeEnv, self).__init__()
         
+        assert parenting == -1, "Parenting not available for this environment"
+        
         # Node status codes
-        # self.HAS_NOTHING = np.array([0.0], dtype=np.float32)
-        # self.HAS_MSG = np.array([2.0], dtype=np.float32)
-        # self.IS_TARGET = np.array([3.0], dtype=np.float32)
         self.NODE_HAS_MSG = 0
         self.NODE_IS_TARGET = 1
         
         # Edge status codes
-        # self.IS_NOT_TAKEN = np.array([1.0], dtype=np.float32)
-        # self.HAS_MSG = np.array([2.0], dtype=np.float32)
         self.EDGE_IS_TAKEN = 1
         self.EDGE_WEIGHT = 0
         
@@ -42,12 +41,9 @@ class SteinerTreeEnv(gym.Env):
         self.n_dests = n_dests
         self.weighted = weighted
         self.action_space = gym.spaces.Discrete(n_edges)
-        # self.observation_space = gym.spaces.Box(low=0, high=1000, shape=(n_nodes+2*n_edges+2*n_edges*2,))
-        self.observation_space = gym.spaces.Box(low=0, high=1000, shape=(2*n_nodes+2*n_edges*2+2*n_edges*2,))
-        # self.observation_space = gym.spaces.Graph(
-        #     node_space=gym.spaces.Box(low=0, high=4, shape=(1,)), 
-        #     edge_space=gym.spaces.Box(low=0, high=1, shape=(1,)),
-        #     )
+       
+        self.observation_space = gym.spaces.Box(low=0, high=1000, shape=((2 + fe.get_num_features())*n_nodes+2*n_edges*2+2*n_edges*2,))
+       
         self.is_eval_env = is_eval_env
         
 
@@ -71,9 +67,8 @@ class SteinerTreeEnv(gym.Env):
         for u, v, d in G.edges(data=True):
             d['delay'] = delay[u, v]
         
-       
-        # x = np.zeros((self.n_nodes, 1), dtype=np.float32) + self.HAS_NOTHING
-        x = np.zeros((self.n_nodes, 2), dtype=np.float32)      
+        
+        x = np.zeros((self.n_nodes, 2+ fe.get_num_features()), dtype=np.float32)      
         
         self.dests = np.random.choice(self.n_nodes, self.n_dests+1, replace=False)
         
@@ -97,6 +92,10 @@ class SteinerTreeEnv(gym.Env):
         x[self.src, self.NODE_HAS_MSG] = 1
         x[self.dests, self.NODE_IS_TARGET] = 1
         
+        # Adding structural features
+        sf = fe.generate_features(G)
+        x[:, -fe.get_num_features():] = sf
+        
         self.adj = nx.adjacency_matrix(G).todense()
         
         edge_index = np.array(list(G.edges))
@@ -110,12 +109,9 @@ class SteinerTreeEnv(gym.Env):
 
         self.solution_cost = 0
         info = {'mask': self._get_mask()}
-        self._vectorize_graph(self.graph)
-        return self._vectorize_graph(self.graph), info
+        
+        return vectorize_graph(self.graph), info
     
-    
-    def _vectorize_graph(self, graph):
-        return np.concatenate((graph.nodes.flatten(), graph.edges.flatten(), graph.edge_links.flatten()), dtype=np.float32)
     
     def _get_mask(self) -> np.array:
         mask = np.zeros((2 * self.n_edges,), dtype=bool) < 1.0
@@ -143,11 +139,6 @@ class SteinerTreeEnv(gym.Env):
         self.graph.nodes[v, self.NODE_HAS_MSG] = 1
         self.generated_solution.append((u, v))
         
-        
-        # print(self.graph.nodes[:, self.NODE_IS_TARGET] == 1)
-        # print(self.graph.nodes[:, self.NODE_HAS_MSG] == 0)
-        # print(np.logical_and(self.graph.nodes[:, self.NODE_HAS_MSG] == 0, self.graph.nodes[:, self.NODE_IS_TARGET] == 1))
-         
         if np.logical_and(self.graph.nodes[:, self.NODE_HAS_MSG] == 0, self.graph.nodes[:, self.NODE_IS_TARGET] == 1).sum() == 0:
             done = True
    
@@ -163,5 +154,5 @@ class SteinerTreeEnv(gym.Env):
             assert info['mask'].sum() > 0, "No more actions possible! Shouldn't happen!"
         
         
-        return self._vectorize_graph(self.graph), reward, done, False, info
+        return vectorize_graph(self.graph), reward, done, False, info
         

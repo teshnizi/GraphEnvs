@@ -11,12 +11,17 @@ import random
 from typing import Tuple
 from matplotlib import pyplot as plt
 
+
+from graph_envs.utils import vectorize_graph
+import graph_envs.feature_extraction as fe
+
+
 class MulticastRoutingEnv(gym.Env):
     '''
     Environment for multicast routing problem.
     '''
     # Meta Data:
-    n_node_features = 4
+    # n_node_features = 4
     n_edge_features = 2
     has_mask = True
     
@@ -59,7 +64,7 @@ class MulticastRoutingEnv(gym.Env):
         # self.max_distance = max_distance
             
         self.action_space = gym.spaces.Discrete(n_edges)
-        self.observation_space = gym.spaces.Box(low=-1000, high=1000, shape=(self.n_node_features*n_nodes+self.n_edge_features*n_edges*2+2*n_edges*2,))
+        self.observation_space = gym.spaces.Box(low=-1000, high=1000, shape=((4 +fe.get_num_features())*n_nodes+self.n_edge_features*n_edges*2+2*n_edges*2,))
     
         self.is_eval_env = is_eval_env
 
@@ -84,7 +89,7 @@ class MulticastRoutingEnv(gym.Env):
             d['delay'] = delay[u, v]
         
         
-        x = np.zeros((self.n_nodes, self.n_node_features), dtype=np.float32)      
+        x = np.zeros((self.n_nodes, 4 + fe.get_num_features()), dtype=np.float32)      
         
         self.src = 0
         self.dests = np.random.choice(np.arange(1, self.n_nodes), size=self.n_dests, replace=False)
@@ -124,6 +129,9 @@ class MulticastRoutingEnv(gym.Env):
         x[:, self.NODE_DISTANCE_FROM_SOURCE] = -1
         x[self.src, self.NODE_DISTANCE_FROM_SOURCE] = 0
         
+        # Adding structural features
+        sf = fe.generate_features(G)
+        x[:, -fe.get_num_features():] = sf
                 
         self.adj = nx.adjacency_matrix(G).todense()
         
@@ -139,15 +147,11 @@ class MulticastRoutingEnv(gym.Env):
         self.constraints_satisfied = 0
         
         info = {'mask': self._get_mask()}
-        self._vectorize_graph(self.graph)
         
-
-        return self._vectorize_graph(self.graph), info
+        return vectorize_graph(self.graph), info
     
     
-    def _vectorize_graph(self, graph):
-        return np.concatenate((graph.nodes.flatten(), graph.edges.flatten(), graph.edge_links.flatten()), dtype=np.float32)
-    
+   
     def _get_mask(self) -> np.array:
         # print('=========')
         mask = np.zeros((2 * self.n_edges,), dtype=bool) < 1.0
@@ -211,7 +215,8 @@ class MulticastRoutingEnv(gym.Env):
             reward = -2*self.n_nodes * self.n_dests
             done = True
             info['solved'] = False
-            return self._vectorize_graph(self.graph), reward, done, False, info
+            info['mask'] = self._get_mask()
+            return vectorize_graph(self.graph), reward, done, False, info
             
             
         self.graph.nodes[v, self.NODE_HAS_MSG] = 1
@@ -228,7 +233,8 @@ class MulticastRoutingEnv(gym.Env):
                 reward = -2*self.n_nodes * self.n_dests
                 done = True
                 info['solved'] = False
-                return self._vectorize_graph(self.graph), reward, done, False, info
+                info['mask'] = self._get_mask()
+                return vectorize_graph(self.graph), reward, done, False, info
             
             reward += 1
             self.constraints_satisfied += 1
@@ -249,7 +255,7 @@ class MulticastRoutingEnv(gym.Env):
             reward = -2*self.n_nodes * self.n_dests
             done = True
             info['solved'] = False
-            return self._vectorize_graph(self.graph), reward, done, False, info
+            return vectorize_graph(self.graph), reward, done, False, info
             
         
         if done:
@@ -257,4 +263,4 @@ class MulticastRoutingEnv(gym.Env):
             info['solution_cost'] = self.solution_cost
         
         
-        return self._vectorize_graph(self.graph), reward, done, False, info
+        return vectorize_graph(self.graph), reward, done, False, info
