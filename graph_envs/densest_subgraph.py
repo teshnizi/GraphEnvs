@@ -17,7 +17,7 @@ class DensestSubgraphEnv(gym.Env):
         - weighted: whether the graph is weighted or not
     '''
     
-    def __init__(self, n_nodes, n_edges, weighted=False, return_graph_obs=False, is_eval_env=False, parenting=-1) -> None:
+    def __init__(self, n_nodes, n_edges, weighted=False, n_choices=-1, return_graph_obs=False, is_eval_env=False, parenting=-1) -> None:
         super(DensestSubgraphEnv, self).__init__()
         
         assert parenting in [0,1], "Parenting must be 0 or 1"
@@ -30,7 +30,10 @@ class DensestSubgraphEnv(gym.Env):
         self.n_nodes = n_nodes
         if n_edges == -1:
             n_edges = int((n_nodes * (n_nodes - 1) // 2) * 0.30)
-
+        if n_choices == -1:
+            n_choices = n_nodes//np.exp(1)
+            
+        self.n_choices = n_choices
         self.n_edges = n_edges
         self.weighted = weighted
         self.action_space = gym.spaces.Discrete(n_nodes)
@@ -163,16 +166,20 @@ class DensestSubgraphEnv(gym.Env):
         
         self.solution_cost = self.edge_taken_cnt / len(self.nodes_taken)
                 
-        
         info['mask'] = self._get_mask()
 
-            
+        if len(self.nodes_taken) == self.n_choices:
+            assert (self.graph.nodes[:-1, self.NODE_IS_TAKEN]==1).sum() == self.n_choices, "Bug!"
+            done = True
+        
         if (info['mask'].sum() == 0):
             assert len(self.nodes_taken) == self.n_nodes-1, "Bug!"
+            # assert len(self.nodes_taken) == self.n_choices, "Bug!"
+            # assert (self.graph.nodes[:-1, self.NODE_IS_TAKEN]==1).sum() == self.n_choices, "Bug!"
             assert self.edge_taken_cnt == self.n_edges, "Bug!"
             assert (self.graph.nodes[:-1, self.NODE_IS_TAKEN]==1).all(), "Bug!"
-            reward = 0
-            done = True
+            # reward = 0
+            # done = True
             
         if done:
             info['nodes_taken'] = self.nodes_taken

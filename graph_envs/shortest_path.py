@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any, Generic, SupportsFloat, TypeVar, Tuple
 import networkx as nx 
 import random
 
+from graph_envs.utils import vectorize_graph
+import graph_envs.feature_extraction as fe
 
 class ShortestPathEnv(gym.Env):
     '''
@@ -18,23 +20,26 @@ class ShortestPathEnv(gym.Env):
         - weighted: whether the graph is weighted or not
     '''
     
-    def __init__(self, n_nodes, n_edges, weighted=True, return_graph_obs=False, is_eval_env=False) -> None:
+    def __init__(self, n_nodes, n_edges, weighted=True, return_graph_obs=False, parenting=-1, structural_features=True, is_eval_env=False) -> None:
         super(ShortestPathEnv, self).__init__()
         
-        self.HAS_NOTHING = np.array([0.0], dtype=np.float32)
-        self.IS_TAKEN = np.array([1.0], dtype=np.float32)
-        self.IS_TARGET = np.array([1.0], dtype=np.float32)
+        assert parenting == -1, "Parenting is not available for shortest path"
+        
+        # self.HAS_NOTHING = np.array([0.0], dtype=np.float32)
+        
+        self.NODE_HAS_MSG = 0
+        self.NODE_IS_TARGET = 1
+        
+        # self.IS_TAKEN = np.array([1.0], dtype=np.float32)
+        # self.IS_TARGET = np.array([1.0], dtype=np.float32)
+        
         
         self.n_nodes = n_nodes
         self.n_edges = n_edges
         self.weighted = weighted
         self.action_space = gym.spaces.Discrete(n_nodes)
-        # self.observation_space = gym.spaces.Box(low=-1., high=11., shape=(2, n_nodes, n_nodes))        
-        # self.observation_space = gym.spaces.Graph(
-        #     node_space=gym.spaces.Box(low=0, high=4, shape=(1,)), 
-        #     edge_space=gym.spaces.Box(low=0, high=1, shape=(1,)),
-        #     )
-        self.observation_space = gym.spaces.Box(low=0, high=1000, shape=(2*n_nodes+2*n_edges+2*n_edges*2,))
+
+        self.observation_space = gym.spaces.Box(low=0, high=1000, shape=((2+fe.get_num_features())*n_nodes+2*n_edges+2*n_edges*2,))
         self.return_graph_obs = return_graph_obs
         self.solution_cost = 0
         self.is_eval_env = is_eval_env
@@ -45,7 +50,6 @@ class ShortestPathEnv(gym.Env):
             super().reset(seed=seed)
             random.seed(seed)
             np.random.seed(seed)
-        
         
         while True:
             G = nx.gnm_random_graph(self.n_nodes, self.n_edges)
@@ -62,12 +66,18 @@ class ShortestPathEnv(gym.Env):
         for u, v, d in G.edges(data=True):
             d['delay'] = delay[u, v]
         
+        
         G = G.to_directed()
         
-        x = np.zeros((self.n_nodes, 2), dtype=np.float32) + self.HAS_NOTHING
+        x = np.zeros((self.n_nodes, 2 + fe.get_num_features()), dtype=np.float32)
         
         self.src, self.dest = np.random.choice(self.n_nodes, size=2, replace=False)
-        x[self.src, 0], x[self.dest, 1] = self.IS_TAKEN, self.IS_TARGET
+        x[self.src, self.NODE_HAS_MSG], x[self.dest, self.NODE_IS_TARGET] = 1, 1
+        
+        # Adding structural features
+        sf = fe.generate_features(G)
+        x[:, -fe.get_num_features():] = sf
+        
         self.head = self.src
         self.adj = nx.adjacency_matrix(G, weight='delay').todense()
         
@@ -79,19 +89,13 @@ class ShortestPathEnv(gym.Env):
         if self.is_eval_env:
             self.optimal_solution = nx.shortest_path_length(G, source=self.src, target=self.dest, weight='delay')
         
-        
-        # print('-----')
-        # print(self.graph.nodes)
         info = {'mask': self._get_mask()}
         
         if self.return_graph_obs:
             info['graph_obs'] = self.graph
         
         self.solution_cost = 0
-        return self._vectorize_graph(self.graph), info
-    
-    def _vectorize_graph(self, graph):
-        return np.concatenate((graph.nodes.flatten(), graph.edges.flatten(), graph.edge_links.flatten()), dtype=np.float32)
+        return vectorize_graph(self.graph), info
     
     
     def _get_neighbors(self, node):
@@ -101,7 +105,7 @@ class ShortestPathEnv(gym.Env):
     def _get_mask(self) -> np.array:
         mask = np.zeros((self.n_nodes,), dtype=bool)
         mask[self._get_neighbors(self.head)] = 1
-        mask[self.graph.nodes[:, 0] == self.IS_TAKEN] = 0
+        mask[self.graph.nodes[:, self.NODE_HAS_MSG] == 1] = 0
         return mask
     
     def step(self, action: int) -> Tuple[gym.spaces.GraphInstance, SupportsFloat, bool, bool, dict]:
@@ -109,22 +113,20 @@ class ShortestPathEnv(gym.Env):
         assert self._get_mask()[action] == True, f"Mask of {action} is False!"
 
         assert action in self._get_neighbors(self.head), f"Node {action} is not a neighbor of the current path head {self.head}!"
-        assert np.isclose(self.graph.nodes[action, 0], self.IS_TAKEN) == False, f"Node {action} is already a part of the path!"
-        
-        
+        assert np.isclose(self.graph.nodes[action, self.NODE_HAS_MSG], 1) == False, f"Node {action} is already a part of the path!"
         
         done = False
         reward = -self.adj[self.head, action]
         self.solution_cost -= reward
         info = {}
         
-        if np.isclose(self.graph.nodes[action, 1], self.IS_TARGET):
+        if np.isclose(self.graph.nodes[action, self.NODE_IS_TARGET], 1):
             # reward += self.n_nodes
             done = True
             info['solved'] = True
         
         
-        self.graph.nodes[action, 0] = self.IS_TAKEN
+        self.graph.nodes[action, self.NODE_HAS_MSG] = 1
         self.head = action
         
         info['mask'] = self._get_mask()
@@ -136,5 +138,5 @@ class ShortestPathEnv(gym.Env):
         if done:
             info['heuristic_solution'] = self.optimal_solution
             info['solution_cost'] = self.solution_cost
-        return self._vectorize_graph(self.graph), reward, done, False, info
+        return vectorize_graph(self.graph), reward, done, False, info
         
