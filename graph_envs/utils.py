@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 import importlib
 
-import torch_geometric as pyg
+
 
 def devectorize_graph(vector, env_id, **kwargs):
     bs = vector.shape[0]
@@ -23,6 +23,7 @@ def devectorize_graph(vector, env_id, **kwargs):
     
 
 def to_pyg_graph(x, edge_features, edge_index):
+    import torch_geometric as pyg
     graphs = [pyg.data.Data(x=x[i,:,:], edge_attr=edge_features[i,:,:], edge_index=edge_index[i,:,:].T) for i in range(x.shape[0])]
     batch = pyg.data.Batch.from_data_list(graphs).to(x.device)
     return batch
@@ -42,7 +43,7 @@ def get_env_info(env_id):
         edge_f = 1
         action_type = "node"
     elif env_id == "TSP-v0":
-        node_f = 1
+        node_f = 2
         edge_f = 1
         action_type = "node"
     elif env_id == 'DistributionCenter-v0':
