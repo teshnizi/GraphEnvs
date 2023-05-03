@@ -5,9 +5,10 @@ import torch
 import networkx as nx 
 
 import matplotlib.pyplot as plt
-
+from graph_envs.feature_extraction import get_num_features
 import importlib
 
+# import torch_geometric as pyg
 
 
 def devectorize_graph(vector, env_id, **kwargs):
@@ -23,7 +24,6 @@ def devectorize_graph(vector, env_id, **kwargs):
     
 
 def to_pyg_graph(x, edge_features, edge_index):
-    import torch_geometric as pyg
     graphs = [pyg.data.Data(x=x[i,:,:], edge_attr=edge_features[i,:,:], edge_index=edge_index[i,:,:].T) for i in range(x.shape[0])]
     batch = pyg.data.Batch.from_data_list(graphs).to(x.device)
     return batch
@@ -62,10 +62,14 @@ def get_env_info(env_id):
         node_f = 1
         edge_f = 1
         action_type = "node"
+    elif env_id == 'PerishableProductDelivery-v0':
+        node_f = 1+3*5
+        edge_f = 1
+        action_type = "node"
     else:
         assert False, "Unknown env_id"
     
-    node_f += 6
+    node_f += get_num_features()
     return node_f, edge_f, action_type
 
 

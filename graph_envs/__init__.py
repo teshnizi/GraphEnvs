@@ -48,3 +48,9 @@ register(
     id='DensestSubgraph-v0',
     entry_point='graph_envs.densest_subgraph:DensestSubgraphEnv',
 )
+
+
+register(
+    id='PerishableProductDelivery-v0',
+    entry_point='graph_envs.perishable_product_delivery:PerishableProductDeliveryEnv',
+)

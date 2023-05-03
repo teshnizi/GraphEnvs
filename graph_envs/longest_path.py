@@ -26,7 +26,7 @@ class LongestPathEnv(gym.Env):
     def __init__(self, n_nodes, n_edges, weighted=True, return_graph_obs=False, is_eval_env=False, parenting=-1) -> None:
         super(LongestPathEnv, self).__init__()
         
-        assert parenting in [0,1,2]
+        assert parenting in [0,1,2,3]
         # 0: no parenting
         # 1: Removing nodes that are not connected to the head
         # 2: Removing nodes that have no path to the destination in the residual graph
@@ -114,11 +114,8 @@ class LongestPathEnv(gym.Env):
         
 
         return vectorize_graph(self.graph), info
-    
-    def _vectorize_graph(self, graph):
-        return np.concatenate((graph.nodes.flatten(), graph.edges.flatten(), graph.edge_links.flatten()), dtype=np.float32)
-    
-    
+
+
     def _get_neighbors(self, node):
         neigbors = self.graph.edge_links[self.graph.edge_links[:, 0] == node, 1]
         return neigbors
@@ -132,13 +129,17 @@ class LongestPathEnv(gym.Env):
             mask[self._get_neighbors(self.head)] = 1
             mask[self.graph.nodes[:, self.NODE_HAS_MSG] == 1] = 0
             
-            if self.parenting == 2:
+            if self.parenting >= 2:
                 if not self.dest in self.alt_G.nodes:
                     return mask 
                 for k in range(self.n_nodes):
                     if mask[k] == True:
                         if not nx.has_path(self.alt_G, k, self.dest):
                             mask[k] = False
+                if self.parenting == 3:
+                    if self.alt_G.number_of_nodes() <= self.n_nodes//3:
+                        mask[self.alt_G.nodes] = 1
+
         return mask
     
     def step(self, action: int) -> Tuple[gym.spaces.GraphInstance, SupportsFloat, bool, bool, dict]:

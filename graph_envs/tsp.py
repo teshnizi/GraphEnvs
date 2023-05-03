@@ -34,7 +34,7 @@ class TSPEnv(gym.Env):
         self.weighted = weighted
         
         self.action_space = gym.spaces.Discrete(n_nodes)
-        self.observation_space = gym.spaces.Box(low=0, high=1000, shape=((2 + fe.get_num_features()) *n_nodes+2*n_edges+2*n_edges*2,))
+        self.observation_space = gym.spaces.Box(low=-10, high=1000, shape=((2 + fe.get_num_features()) *n_nodes+2*n_edges+2*n_edges*2,))
         
         self.return_graph_obs = return_graph_obs
         self.is_eval_env = is_eval_env
@@ -112,6 +112,10 @@ class TSPEnv(gym.Env):
         
         info = {'mask': self._get_mask()}
         
+        # assert info['mask'].sum() > 0, "No valid actions!"
+        if info['mask'].sum() == 0:
+            info['mask'][self.start] = 1
+            
         if self.return_graph_obs:
             info['graph_obs'] = self.graph
         
@@ -155,6 +159,16 @@ class TSPEnv(gym.Env):
     
     def step(self, action: int) -> Tuple[gym.spaces.GraphInstance, SupportsFloat, bool, bool, dict]:
         
+        if (action == self.start) and (self.head == self.start):
+            done = True
+            reward = - self.n_nodes
+            info = {}
+            info['solved'] = False
+            info['heuristic_solution'] = self.optimal_solution
+            info['solution_cost'] = -1
+            info['mask'] = self._get_mask()
+            return vectorize_graph(self.graph), reward, done, False, info
+            
         assert (action < self.n_nodes), f"Node {action} is out of bounds!"
         assert self._get_mask()[action] == True, f"Mask of {action} is False!"
         assert action in self._get_neighbors(self.head), f"Node {action} is not a neighbor of the current path head {self.head}!"
@@ -188,13 +202,12 @@ class TSPEnv(gym.Env):
         if np.isclose(self.graph.nodes[:, self.NODE_TAKEN], 0).any() == False:   
             if action == self.start: 
                 done = True
-                reward += self.n_nodes
                 info['solved'] = True
         
         info['mask'] = self._get_mask()
         if (not done) and (info['mask'].sum() == 0):
             done = True
-            reward -= np.isclose(self.graph.nodes[:, self.NODE_TAKEN], 0).sum() * 10
+            reward -= self.n_nodes * 2
             info['solved'] = False
             
         if done:
