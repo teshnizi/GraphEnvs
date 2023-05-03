@@ -27,7 +27,7 @@ for _ in range(5):
         valid_actions = mask.nonzero()[0]
         action = np.random.choice(valid_actions)
         obs, reward, done, _, info = env.step(action)
-        print(obs, rewards, done)
+        print(obs, reward, done)
         mask = info['mask']
 
 ```
