@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from graph_envs.feature_extraction import get_num_features
 import importlib
 
-# import torch_geometric as pyg
+import torch_geometric as pyg
 
 
 def devectorize_graph(vector, env_id, **kwargs):
@@ -43,7 +43,7 @@ def get_env_info(env_id):
         edge_f = 1
         action_type = "node"
     elif env_id == "TSP-v0":
-        node_f = 2
+        node_f = 4
         edge_f = 1
         action_type = "node"
     elif env_id == 'DistributionCenter-v0':

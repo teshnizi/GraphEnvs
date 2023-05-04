@@ -23,15 +23,15 @@ class PerishableProductDeliveryEnv(gym.Env):
         - weighted: whether the graph is weighted or not
     '''
     
-    def __init__(self, n_nodes, n_edges, num_products=3, delivery_time=-1, weighted=True, return_graph_obs=False, is_eval_env=False, parenting=-1) -> None:
+    def __init__(self, n_nodes, n_edges, n_products=3, delivery_time=-1, weighted=True, return_graph_obs=False, is_eval_env=False, parenting=-1) -> None:
         super(PerishableProductDeliveryEnv, self).__init__()
         
-        assert parenting in [1,2,3]
+        assert parenting in [1], "Parenting must be 1!"
         # 0: no parenting
         # 1: Removing nodes that are not connected to the head
-        # 2: Removing nodes that have no path to the destination in the residual graph
+        # 2: Removing nodes that result in time exceeding the delivery time
         
-        assert num_products <= 5, "Max 5 products!"
+        assert n_products <= 5, "Max 5 products!"
         
         self.NODE_IS_HEAD = 0
         self.NODE_HAS_P = np.array([1, 2, 3, 4, 5])
@@ -42,7 +42,7 @@ class PerishableProductDeliveryEnv(gym.Env):
         self.EDGE_WEIGHT = 0
         
         self.max_products = len(self.NODE_HAS_P)
-        self.num_products = num_products
+        self.n_products = n_products
         
         self.n_nodes = n_nodes
         if n_edges == -1:
@@ -54,9 +54,11 @@ class PerishableProductDeliveryEnv(gym.Env):
             if weighted:
                 avg_dist = avg_dist * (0.3+1.0)/2.0
                 
-            delivery_time = avg_dist * 1.4
+            self.dt_mn = avg_dist*0.6
+            self.dt_mx = avg_dist*1.4
+            
         
-        self.delivery_time = delivery_time
+        self.delivery_time = -1
         self.n_edges = n_edges
         self.weighted = weighted
         self.action_space = gym.spaces.Discrete(n_nodes)
@@ -65,7 +67,7 @@ class PerishableProductDeliveryEnv(gym.Env):
         self.return_graph_obs = return_graph_obs
         self.solution_cost = 0
         self.is_eval_env = is_eval_env
-        self.max_steps = self.n_nodes * 2
+        self.max_steps = self.n_nodes * self.n_products * 50
 
     def reset(self, seed=None, options={}) -> np.array:
         
@@ -75,8 +77,8 @@ class PerishableProductDeliveryEnv(gym.Env):
             random.seed(seed)
             np.random.seed(seed)
         
-        self.pickups = [-1]*self.num_products
-        self.dropoffs = [-1]*self.num_products
+        self.pickups = [-1]*self.n_products
+        self.dropoffs = [-1]*self.n_products
         
         while True:
             G = nx.gnm_random_graph(self.n_nodes, self.n_edges)
@@ -93,10 +95,11 @@ class PerishableProductDeliveryEnv(gym.Env):
             for u, v, d in G.edges(data=True):
                 d['delay'] = delay[u, v]
             
-                
+            self.delivery_time = np.random.rand()*(self.dt_mx-self.dt_mn) + self.dt_mn
+            
             apsp = nx.floyd_warshall(G, weight='delay')
             
-            for i in range(self.num_products):
+            for i in range(self.n_products):
                 # choose a pickup from nodes not already chosen
                 self.pickups[i] =  np.random.choice([node for node in range(self.n_nodes) \
                     if (not node in self.pickups) and (not node in self.dropoffs)])
@@ -113,10 +116,11 @@ class PerishableProductDeliveryEnv(gym.Env):
         
         self.G = G
         G = G.to_directed()
+        self.apsp = apsp
         
         x = np.zeros((self.n_nodes, 1 + 3*self.max_products + fe.get_num_features()), dtype=np.float32)
         
-        for i in range(self.num_products):
+        for i in range(self.n_products):
             x[self.pickups[i], self.NODE_HAS_P[i]] = 1
             x[self.dropoffs[i], self.NODE_NEEDS_P[i]] = 1
             x[:, self.NODE_TIME_LEFT_P[i]] = self.delivery_time
@@ -140,7 +144,7 @@ class PerishableProductDeliveryEnv(gym.Env):
         if self.is_eval_env:
             total_length = 0
             curr_node = self.head
-            for product in range(self.num_products):
+            for product in range(self.n_products):
                 total_length += nx.shortest_path_length(G, source=curr_node, target=self.pickups[product], weight='delay')
                 total_length += nx.shortest_path_length(G, source=self.pickups[product], target=self.dropoffs[product], weight='delay')
             self.optimal_solution = total_length
@@ -168,11 +172,23 @@ class PerishableProductDeliveryEnv(gym.Env):
         
     def _get_mask(self) -> np.array:
         mask = np.zeros((self.n_nodes,), dtype=bool)
-        for i in range(self.num_products):
+        for i in range(self.n_products):
             if self.graph.nodes[self.head, self.NODE_HAS_P[i]] == 1:
                 mask[self.head] = True
                 
         mask[self._get_neighbors(self.head)] = True
+        
+        if self.parenting >= 2:
+            # For each product already taken, mask nodes that are farther from the dropoff than the remaining delivery time:
+            valid_nodes = self._get_neighbors(self.head)
+            for i in range(self.n_products):
+                if self.graph.nodes[self.head, self.NODE_HAS_P[i]] == -1:
+                    for v in valid_nodes:
+                        if self.apsp[v][self.dropoffs[i]] + self.adj[self.head, v] > self.graph.nodes[self.head, self.NODE_TIME_LEFT_P[i]]:
+                            mask[v] = False
+                            # print(f'Node {v} masked because of product {i} with time left {self.graph.nodes[v, self.NODE_TIME_LEFT_P[i]]}!')
+                    
+                
         return mask
     
     def step(self, action: int) -> Tuple[gym.spaces.GraphInstance, SupportsFloat, bool, bool, dict]:
@@ -211,7 +227,7 @@ class PerishableProductDeliveryEnv(gym.Env):
             self.graph.nodes[action, self.NODE_IS_HEAD] = 1
             self.head = action
             
-            for prod in range(self.num_products):
+            for prod in range(self.n_products):
                 # If the product is taken, take the edge and reduce the product time left
                 if self.graph.nodes[self.head, self.NODE_HAS_P[prod]] == -1:
                     self.graph.nodes[:, self.NODE_TIME_LEFT_P[prod]] -= self.adj[self.head, action]
@@ -219,7 +235,7 @@ class PerishableProductDeliveryEnv(gym.Env):
                     if self.graph.nodes[:, self.NODE_TIME_LEFT_P[prod]].sum() < 0 - 1e-6:
         
                         done = True
-                        reward = -2*self.n_nodes*self.num_products
+                        reward = -2*self.n_nodes*self.n_products
                         info['solved'] = False
                         return vectorize_graph(self.graph), reward, done, False, info
                     
@@ -239,10 +255,17 @@ class PerishableProductDeliveryEnv(gym.Env):
         elif len(self.edges_taken) >= self.max_steps:
             done = True
             info['solved'] = False
-            reward = -2*self.n_nodes*self.num_products
+            reward = -2*self.n_nodes*self.n_products
             
         info['mask'] = self._get_mask()       
-        assert (info['mask'].sum() > 0), f"Mask is empty!"
+        
+        if self.parenting <= 1:
+            assert (info['mask'].sum() > 0), f"Mask is empty!"
+        elif self.parenting == 2:
+            if info['mask'].sum() == 0:
+                done = True
+                info['solved'] = False
+                reward = -2*self.n_nodes*self.n_products
 
             
         return vectorize_graph(self.graph), reward, done, False, info

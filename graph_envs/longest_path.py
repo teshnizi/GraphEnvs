@@ -75,6 +75,7 @@ class LongestPathEnv(gym.Env):
             d['delay'] = delay[u, v]
         
         G = G.to_directed()
+        self.G = G
         
         x = np.zeros((self.n_nodes, 2 + fe.get_num_features()), dtype=np.float32)
         
@@ -110,6 +111,7 @@ class LongestPathEnv(gym.Env):
             info['graph_obs'] = self.graph
         
         self.solution_cost = 0
+        
         self.edges_taken = []
         
 

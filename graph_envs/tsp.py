@@ -19,19 +19,24 @@ class TSPEnv(gym.Env):
         - weighted: whether the graph is weighted or not
     '''
     
-    def __init__(self, n_nodes, n_edges, weighted=True, return_graph_obs=False, parenting=-1, is_eval_env=False) -> None:
+    def __init__(self, n_nodes, n_edges, weighted=True, return_graph_obs=False, parenting=-1, spatial=False, is_eval_env=False) -> None:
         super(TSPEnv, self).__init__()
         
         assert parenting in [1,2], "Parenting must be either 1 or 2"
-        
+        if spatial:
+            assert weighted == True, "Spatial TSP must be weighted"
         
         self.NODE_TAKEN = 0
         self.NODE_IS_SOURCE = 1
+        self.NODE_X = 2
+        self.NODE_Y = 3
+        
         self.EDGE_WEIGHT = 0
         
         self.n_nodes = n_nodes
         self.n_edges = n_edges
         self.weighted = weighted
+        self.spatial = spatial
         
         self.action_space = gym.spaces.Discrete(n_nodes)
         self.observation_space = gym.spaces.Box(low=-10, high=1000, shape=((2 + fe.get_num_features()) *n_nodes+2*n_edges+2*n_edges*2,))
@@ -39,6 +44,7 @@ class TSPEnv(gym.Env):
         self.return_graph_obs = return_graph_obs
         self.is_eval_env = is_eval_env
         self.parenting = parenting
+        
         
         
     def reset(self, seed=None, options={}) -> np.array:
@@ -64,15 +70,44 @@ class TSPEnv(gym.Env):
             if nx.is_connected(cp):
                 break
         
-        if self.weighted:
-            delay = np.random.randint(3, 10, size=(self.n_nodes, self.n_nodes))/10.0
+        
+        # if self.weighted:
+        #     delay = np.random.randint(3, 10, size=(self.n_nodes, self.n_nodes))/10.0
+        # else:
+        #     delay = np.random.randint(1, 2, size=(self.n_nodes, self.n_nodes))/1.0
+        
+        if self.spatial:
+            # Generate spatial coordinates
+            for v in G.nodes():
+                G.nodes[v]['x'] = np.random.rand() * 10
+                G.nodes[v]['y'] = np.random.rand() * 10
+            # Calculate the euclidean distance between nodes and set it as delay
+            for u, v, d in G.edges(data=True):
+                d['weight'] = np.sqrt((G.nodes[u]['x'] - G.nodes[v]['x'])**2 + (G.nodes[u]['y'] - G.nodes[v]['y'])**2)
         else:
-            delay = np.random.randint(1, 2, size=(self.n_nodes, self.n_nodes))/1.0
-            
+            if self.weighted:
+                for u, v, d in G.edges(data=True):
+                    d['weight'] = np.random.randint(3, 10)/10.0
+            else:
+                for u, v, d in G.edges(data=True):
+                    d['weight'] = np.random.randint(1, 2)/1.0
+                
         
+        # from matplotlib import pyplot as plt
+        # fig = plt.figure(figsize=(10,10))
+        # # calculate the layout pbased on node coordinates
+        # pos = {}
+        # for v in G.nodes():
+        #     pos[v] = (G.nodes[v]['x'], G.nodes[v]['y'])
+        # # draw the graph
+        # nx.draw(G, pos=pos, with_labels=True, font_weight='bold')
+        # nx.draw_networkx_labels(G, pos)
+        # # round edge labels to 2 digits:
+        # edge_labels = nx.get_edge_attributes(G, 'weight')
+        # edge_labels = {k: round(v, 2) for k, v in edge_labels.items()}
+        # nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
+        # plt.savefig('graph.png')
         
-        for u, v, d in G.edges(data=True):
-            d['weight'] = delay[u, v]
         
         self.optimal_solution = 0
         
@@ -82,7 +117,6 @@ class TSPEnv(gym.Env):
                 self.optimal_solution += G[self.optimal_cycle[i]][self.optimal_cycle[i+1]]['weight']
             
        
-       
         if self.parenting >= 2:
             self.alt_G = G.copy()
             self.alt_G.remove_node(self.start)
@@ -91,9 +125,13 @@ class TSPEnv(gym.Env):
         G = G.to_directed()
         self.G = G
         
-        x = np.zeros((self.n_nodes, 2+fe.get_num_features()), dtype=np.float32)
+        x = np.zeros((self.n_nodes, 4+fe.get_num_features()), dtype=np.float32)
         
-        
+        if self.spatial:
+            x[:, self.NODE_X] = np.array([G.nodes[v]['x'] for v in G.nodes])
+            x[:, self.NODE_Y] = np.array([G.nodes[v]['y'] for v in G.nodes])
+            
+            
         x[self.start, self.NODE_IS_SOURCE] = 1
         self.head = self.start
             
@@ -119,7 +157,10 @@ class TSPEnv(gym.Env):
         if self.return_graph_obs:
             info['graph_obs'] = self.graph
         
-
+        # print('x: ', x[:, 0:4])
+        # print('edge features: ', edge_f)
+        # print('edges: ', edge_index)
+        
         return vectorize_graph(self.graph), info
     
     # def _vectorize_graph(self, graph):
@@ -213,7 +254,6 @@ class TSPEnv(gym.Env):
         if done:
             info['heuristic_solution'] = self.optimal_solution
             info['solution_cost'] = self.total_solution_cost
-           
            
         return vectorize_graph(self.graph), reward, done, False, info
         
